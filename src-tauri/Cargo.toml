@@ -1,6 +1,6 @@
 [package]
 name = "prob-warp"
-version = "0.1.1"
+version = "0.1.2"
 description = "Warp-styled local LeetCode runner for Java"
 authors = ["rdji20"]
 license = "MIT"
