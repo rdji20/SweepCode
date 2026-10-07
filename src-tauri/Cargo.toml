@@ -1,6 +1,6 @@
 [package]
 name = "sweepcode"
-version = "0.2.0"
+version = "0.3.0"
 description = "SweepCode: Warp-styled local LeetCode runner for Java"
 authors = ["rdji20"]
 license = "MIT"
