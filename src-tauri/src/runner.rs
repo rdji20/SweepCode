@@ -725,6 +725,37 @@ mod tests {
         assert_eq!(r.cases[1].error_kind.as_deref(), Some("stackoverflow"));
     }
 
+    /// Follows docs/TUTORIAL.md "Add your own problem" exactly, so the docs can't rot.
+    #[test]
+    fn tutorial_custom_problem_example() {
+        let f = fixture();
+        let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/custom-problem/count-target");
+        let data = tempfile::tempdir().unwrap();
+        let dest = data.path().join("problems/count-target");
+        std::fs::create_dir_all(&dest).unwrap();
+        for name in ["problem.json", "tests.json", "Solution.java"] {
+            std::fs::copy(example.join(name), dest.join(name)).unwrap();
+        }
+        let store = crate::store::Store::new(data.path().to_path_buf()).unwrap();
+        let listed: Vec<String> = store.list().into_iter().map(|p| p.title).collect();
+        assert_eq!(listed, ["Count Target"]);
+        let ws = store.load("count-target").unwrap();
+        assert_eq!(ws.tests.len(), 4);
+        assert!(ws.code.contains("countTarget"));
+
+        let solved = "class Solution {\n    public int countTarget(int[] nums, int target) {\n        int n = 0;\n        for (int x : nums) if (x == target) n++;\n        return n;\n    }\n}\n";
+        let r = go(&f, ws.problem.meta.clone().unwrap(), solved, ws.tests.clone(), 10);
+        // Three tests have an expected value, the last one only shows its output.
+        assert_eq!(r.verdict, Verdict::Finished, "{r:#?}");
+        assert_eq!(r.summary, "3/3 passed");
+        assert_eq!(r.cases[3].status, CaseStatus::Ran);
+        assert_eq!(r.cases[3].output.as_deref(), Some("2"));
+
+        // The untouched starter code is a compile error, as the tutorial says.
+        let r = go(&f, ws.problem.meta.clone().unwrap(), &ws.code, ws.tests.clone(), 10);
+        assert_eq!(r.verdict, Verdict::CompileError);
+    }
+
     #[test]
     fn prune_keeps_newest() {
         let d = tempfile::tempdir().unwrap();

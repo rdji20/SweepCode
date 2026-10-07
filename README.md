@@ -85,6 +85,9 @@ your cursor. **⌃Space** shows the plain list. Turn them off in Settings. Edit 
 | `chars` | `char[] chars = s.toCharArray();` |
 | `count` | `int[] count = new int[26];` |
 
+**How problems work, adding your own problems and test cases, and teaching the
+app new input types:** see the [tutorial](docs/TUTORIAL.md).
+
 The Tests tab holds one value per line in LeetCode format. Leave "expected"
 empty to just see the output.
 

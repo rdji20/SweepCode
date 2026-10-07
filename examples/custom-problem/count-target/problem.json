@@ -1,0 +1,27 @@
+{
+  "id": "C1",
+  "title": "Count Target",
+  "slug": "count-target",
+  "difficulty": "Easy",
+  "paidOnly": false,
+  "content": "<p>Given an integer array <code>nums</code> and an integer <code>target</code>, return how many times <code>target</code> appears in <code>nums</code>.</p><pre><strong>Input:</strong> nums = [1,2,2,3], target = 2\n<strong>Output:</strong> 2</pre>",
+  "javaCode": "class Solution {\n    public int countTarget(int[] nums, int target) {\n        \n    }\n}\n",
+  "meta": {
+    "kind": "function",
+    "method": "countTarget",
+    "params": [
+      { "name": "nums", "type": "integer[]" },
+      { "name": "target", "type": "integer" }
+    ],
+    "returnType": "integer",
+    "outputParam": null
+  },
+  "examples": [
+    { "inputs": ["[1,2,2,3]", "2"], "expected": "2" },
+    { "inputs": ["[]", "5"], "expected": "0" }
+  ],
+  "tags": ["Array"],
+  "hints": ["Walk the array once and count matches."],
+  "anyOrder": false,
+  "source": "custom"
+}
