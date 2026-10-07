@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- prob-warp app icon: a terminal prompt and a pencil (you write the code yourself).
+       Palette from the app: charcoal #282826, cream #ddd0b2, Warp pink #b16286, orange #e9a23b. -->
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#363430"/>
+      <stop offset="1" stop-color="#22211f"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ddd0b2" stop-opacity="0.32"/>
+      <stop offset="0.5" stop-color="#ddd0b2" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ddd0b2" stop-opacity="0.02"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- macOS icon grid: 824×824 body with continuous-looking corners -->
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#body)" filter="url(#shadow)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="184.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+
+  <!-- prompt chevron -->
+  <polyline points="258,382 422,512 258,642" fill="none" stroke="#ddd0b2" stroke-width="74"
+            stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- pencil, tip at bottom-left -->
+  <g transform="translate(628 512) rotate(-45) scale(1.08)">
+    <!-- wood tip -->
+    <polygon points="-214,0 -132,-56 -132,56" fill="#efe4c9"/>
+    <!-- graphite -->
+    <polygon points="-214,0 -184,-20.5 -184,20.5" fill="#282826"/>
+    <!-- body -->
+    <rect x="-132" y="-56" width="258" height="112" fill="#b16286"/>
+    <rect x="-132" y="-56" width="258" height="34" fill="#c27a9b"/>
+    <!-- ferrule gap -->
+    <rect x="126" y="-56" width="16" height="112" fill="#2a2926"/>
+    <!-- eraser -->
+    <path d="M142,-56 H186 Q214,-56 214,-28 V28 Q214,56 186,56 H142 Z" fill="#e9a23b"/>
+  </g>
+</svg>

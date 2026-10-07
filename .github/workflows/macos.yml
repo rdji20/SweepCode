@@ -1,0 +1,98 @@
+name: macOS app
+
+# Same shape as dealer-control-v2's Windows pipeline: tests first, then the
+# package job builds the installer, records checksums and uploads it.
+# Pushing a tag like v0.1.0 also publishes a GitHub Release people can download.
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application-tests:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The run pipeline compiles and runs Java, so the tests need a JDK.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: cargo test --lib --manifest-path src-tauri/Cargo.toml
+
+  macos-package:
+    needs: application-tests
+    runs-on: macos-latest
+    env:
+      BUNDLE: src-tauri/target/universal-apple-darwin/release/bundle
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: universal
+      - run: pnpm install --frozen-lockfile
+      # One app that runs on both Apple Silicon and Intel Macs.
+      - run: pnpm tauri build --target universal-apple-darwin --bundles app,dmg
+      - name: Record installer checksums
+        run: |
+          cd "$BUNDLE/dmg"
+          for f in *.dmg; do shasum -a 256 "$f" > "$f.sha256"; done
+          echo "commit=${GITHUB_SHA}" > build.txt
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prob-warp-macos-universal
+          path: |
+            ${{ env.BUNDLE }}/dmg/*.dmg
+            ${{ env.BUNDLE }}/dmg/*.sha256
+            ${{ env.BUNDLE }}/dmg/build.txt
+          if-no-files-found: error
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.BUNDLE }}/dmg/*.dmg
+            ${{ env.BUNDLE }}/dmg/*.sha256
+          generate_release_notes: true
+          body: |
+            ## Install
+            1. Download the `.dmg`, open it and drag **prob-warp** into Applications.
+            2. The app is not notarized by Apple yet, so the first launch is blocked.
+               Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+               Or run once in Terminal: `xattr -dr com.apple.quarantine /Applications/prob-warp.app`
+            3. You need a JDK 11 or newer, for example `brew install openjdk@21`.
