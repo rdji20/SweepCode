@@ -36,10 +36,11 @@ This guide has three parts:
 
 ```
 ~/Library/Application Support/com.sweepcode.app/problems/<slug>/
-  problem.json    what LeetCode sent (description, method, examples)
-  tests.json      your test cases (the Tests tab)
-  Solution.java   your code (saved as you type)
-  state.json      when you added/opened it and the last verdict
+  problem.json    what LeetCode sent (description, method, examples, Java and Rust starter code)
+  tests.json      your test cases (the Tests tab, shared by both languages)
+  Solution.java   your Java code (saved as you type)
+  solution.rs     your Rust code
+  state.json      when you added/opened it, the last verdict, and the language you used last
 ```
 
 Loading the same problem again refreshes `problem.json` but never touches your
@@ -49,10 +50,14 @@ code or your tests.
 compiler that stays running in the background. The errors it reports become red
 underlines on the exact word. Nothing runs at this point; it only compiles.
 
-**Running (⌘↵).** The app compiles your code, then starts Java inside the macOS
-sandbox with a time limit. A small driver program reads each test, turns the
-text `[1,2,3]` into a real `int[]`, calls your method, and prints the result the
-way LeetCode does. Your `System.out.println` output is captured per test.
+**Running (⌘↵).** The app compiles your code, then starts it inside the macOS
+sandbox with a time limit. A small driver reads each test, turns the text
+`[1,2,3]` into a real `int[]` (Java) or `Vec<i32>` (Rust), calls your method, and
+prints the result the way LeetCode does. Whatever you print is captured per test.
+
+Java and Rust differ in one step. Java has one driver that inspects your method
+while running. Rust can't do that, so for each run the app reads your method's
+signature and writes a small `main.rs` for it.
 
 **Judging.** Each result is compared with "expected":
 
@@ -100,6 +105,12 @@ Open the **Tests** tab. Each case has one box per parameter and an optional
 | `char[][]` | `[["5","."],[".","3"]]` |
 | `ListNode` | `[1,2,3]` (empty list: `[]`) |
 | `TreeNode` | `[1,null,2,3]` (level order, `null` for a missing child) |
+
+The same text works for Rust: `i32`/`i64` like `int`/`long`, `f64` like
+`double`, `Vec<i32>` like `int[]`, `Vec<Vec<char>>` like `char[][]`,
+`Option<Box<ListNode>>` like `ListNode`, `Option<Rc<RefCell<TreeNode>>>` like `TreeNode`.
+Methods that take `&mut Vec<i32>` and return nothing (in-place problems) print the
+changed vector.
 
 **Add case** copies the last case so you only change what's different.
 **Reset to examples** brings back LeetCode's examples. Leave "expected" empty
@@ -192,6 +203,12 @@ line per parameter, in the formats from the table above. `expected` can be `null
 **Step 4. Put the starter code in `Solution.java`** (or delete it, and the app
 uses `javaCode`).
 
+**For Rust too**, add a `"rustCode"` field to `problem.json` with the Rust
+starter, for example
+`"rustCode": "impl Solution {\n    pub fn count_target(nums: Vec<i32>, target: i32) -> i32 {\n        \n    }\n}\n"`.
+The Rust method name is the snake_case form of `meta.method` (`countTarget` →
+`count_target`).
+
 **Step 5. Quit and reopen SweepCode** (⌘Q). The problem appears at the bottom
 of the sidebar. Press ⌘↵: the untouched starter code gives "missing return
 statement", which means everything is wired up.
@@ -248,6 +265,16 @@ inputs, and the expected output. Then run:
 ```bash
 cd src-tauri && cargo test --lib
 ```
+
+**Rust works the same way.** The Rust side reads inputs through the `FromJson`
+trait and prints through `ToJson`, both in
+[`src-tauri/rust-runtime/runtime.rs`](../src-tauri/rust-runtime/runtime.rs).
+Add an `impl FromJson for YourType` and an `impl ToJson for YourType` next to the
+`ListNode` ones at the bottom of that file. Add the struct itself to
+[`prelude.rs`](../src-tauri/rust-runtime/prelude.rs) if LeetCode normally provides
+it. The generated `main` then uses it automatically, because it parses each
+argument into the exact type written in the user's signature. Rust tests go next
+to `rust_lists_trees_in_place_design_and_types` in `runner.rs`.
 
 **Watch out for name clashes.** LeetCode uses the name `Node` for different
 shapes in different problems: graph neighbors, N-ary children, random pointers.

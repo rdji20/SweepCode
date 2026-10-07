@@ -9,13 +9,14 @@ const twoSum: Workspace = {
     id: "1", title: "Two Sum", slug: "two-sum", difficulty: "Easy", paidOnly: false,
     content: "<p>Return the indices of the two numbers in <code>nums</code> that add up to <code>target</code>.</p><pre><strong>Input:</strong> nums = [2,7,11,15], target = 9\n<strong>Output:</strong> [0,1]</pre><pre><strong>Input:</strong> nums = [3,2,4], target = 6\n<strong>Output:</strong> [1,2]</pre>",
     javaCode: "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        \n    }\n}",
+    rustCode: "impl Solution {\n    pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {\n        \n    }\n}",
     meta: { kind: "function", method: "twoSum", params: [{ name: "nums", type: "integer[]" }, { name: "target", type: "integer" }], returnType: "integer[]", outputParam: null },
     examples: [{ inputs: ["[2,7,11,15]", "9"], expected: "[0,1]" }, { inputs: ["[3,2,4]", "6"], expected: "[1,2]" }],
     tags: ["Array", "Hash Table"], hints: [], anyOrder: true, source: "sample",
   },
   tests: [{ inputs: ["[2,7,11,15]", "9"], expected: "[0,1]" }, { inputs: ["[3,2,4]", "6"], expected: "[1,2]" }, { inputs: ["[3,3]", "6"], expected: "[0,1]" }],
-  code: "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        Map<Integer, Integer> seen = new HashMap<>();\n        for (int i = 0; i < nums.length; i++) {\n            system.out.println(nums[i]);\n            Integer j = seen.get(target - nums[i]);\n            if (j != null) return new int[]{j, i};\n            seen.put(nums[i], i);\n        }\n        return new int[0];\n    }\n}\n",
-  state: { addedAt: 1, openedAt: Date.now(), lastVerdict: null, solved: false },
+  codes: { rust: "impl Solution {\n    pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {\n        vec![]\n    }\n}\n", java: "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        Map<Integer, Integer> seen = new HashMap<>();\n        for (int i = 0; i < nums.length; i++) {\n            system.out.println(nums[i]);\n            Integer j = seen.get(target - nums[i]);\n            if (j != null) return new int[]{j, i};\n            seen.put(nums[i], i);\n        }\n        return new int[0];\n    }\n}\n" },
+  state: { language: null, addedAt: 1, openedAt: Date.now(), lastVerdict: null, solved: false },
 };
 
 const lru: Workspace = {
@@ -23,20 +24,22 @@ const lru: Workspace = {
     id: "146", title: "LRU Cache", slug: "lru-cache", difficulty: "Medium", paidOnly: false,
     content: "<p>Design a least-recently-used cache.</p>",
     javaCode: "class LRUCache {\n    public LRUCache(int capacity) {\n    }\n}",
+    rustCode: null,
     meta: { kind: "design", className: "LRUCache", constructorParams: [], methods: ["get", "put"] },
     examples: [], tags: ["Design"], hints: [], anyOrder: false, source: "leetcode",
   },
   tests: [{ inputs: ['["LRUCache","put","get"]', "[[2],[1,1],[1]]"], expected: "[null,null,1]" }],
-  code: "class LRUCache {\n    public LRUCache(int capacity) {\n    }\n}",
-  state: { addedAt: 2, openedAt: Date.now() - 1000, lastVerdict: "wrongAnswer", solved: false },
+  codes: { java: "class LRUCache {\n    public LRUCache(int capacity) {\n    }\n}", rust: "" },
+  state: { language: null, addedAt: 2, openedAt: Date.now() - 1000, lastVerdict: "wrongAnswer", solved: false },
 };
 
 const workspaces: Record<string, Workspace> = { "two-sum": twoSum, "lru-cache": lru };
-let settings: Settings = { timeoutSecs: 10, memoryMb: 256, fontSize: 14, checkDelayMs: 450, javaHome: null, templates: true };
+let settings: Settings = { timeoutSecs: 10, memoryMb: 256, fontSize: 14, checkDelayMs: 450, javaHome: null, templates: true, defaultLanguage: "java" };
 
 const env: EnvInfo = {
   java: { home: "/mock/jdk-17", java: "/mock/jdk-17/bin/java", javac: "/mock/jdk-17/bin/javac", version: "17.0.8", major: 17, source: "mock" },
   javaError: null, compilerReady: true, sandbox: true, javaGuard: true,
+  rust: { rustc: "/mock/rustc", version: "1.96.0", source: "mock" }, rustError: null,
   paths: { data: "/mock/data", cache: "/mock/cache", logs: "/mock/logs", runs: "/mock/cache/runs" },
   appVersion: "0.1.0-mock",
 };
@@ -53,7 +56,7 @@ function check(code: string): CompileResult {
 }
 
 function run(req: RunRequest): RunReport {
-  const base = { runId: `mock-${Date.now()}`, slug: req.slug, startedAt: new Date().toISOString(), process: { termination: { kind: "exited", code: 0 } as const, elapsedMs: 380, stderr: "", sandboxed: true, javaGuard: true, javaVersion: "17.0.8", command: "java -Xmx256m ... PwDriver job.txt results.jsonl" }, totalMs: 412, runDir: "/mock/cache/runs/x" };
+  const base = { runId: `mock-${Date.now()}`, slug: req.slug, language: req.language, startedAt: new Date().toISOString(), process: { termination: { kind: "exited", code: 0 } as const, elapsedMs: 380, stderr: "", sandboxed: true, guard: true, toolchain: "Java 17.0.8", language: req.language, command: "java -Xmx256m ... PwDriver job.txt results.jsonl" }, totalMs: 412, runDir: "/mock/cache/runs/x" };
   const c = check(req.code);
   if (!c.ok) return { ...base, verdict: "compileError", summary: `${c.diagnostics.length} error`, message: null, compile: c, cases: [], process: null };
   const labels = req.meta.kind === "function" ? req.meta.params.map((p) => p.name) : ["calls", "arguments"];
@@ -87,7 +90,8 @@ export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> =
       case "open_problem": workspaces[a.slug].state.openedAt = Date.now(); return workspaces[a.slug];
       case "fetch_problem": throw "Mock mode cannot reach leetcode.com";
       case "search_problems": return [{ id: "1", title: "Two Sum", slug: "two-sum", difficulty: "Easy", paidOnly: false }, { id: "15", title: "3Sum", slug: "3sum", difficulty: "Medium", paidOnly: false }];
-      case "save_code": workspaces[a.slug].code = a.code; return null;
+      case "save_code": workspaces[a.slug].codes[a.language as "java" | "rust"] = a.code; return null;
+      case "set_language": workspaces[a.slug].state.language = a.language; return null;
       case "save_tests": workspaces[a.slug].tests = a.tests; return null;
       case "check_code": return check(a.code);
       case "run_code": return run(a.request);

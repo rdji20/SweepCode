@@ -36,6 +36,14 @@ const steps: DriveStep[] = [
     },
   },
   {
+    element: '[data-tour="lang"]',
+    popover: {
+      title: "Java or Rust",
+      description: "Solve each problem in either language. Your Java and Rust solutions are saved separately, and the app remembers which one you used last.",
+      side: "bottom",
+    },
+  },
+  {
     element: '[data-tour="editor"]',
     popover: {
       title: "Write Java",

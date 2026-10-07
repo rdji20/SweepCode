@@ -4,19 +4,17 @@
 //! results, the class files and `report.json`. The newest 20 are kept so a
 //! failing run can be inspected after the fact.
 
-use crate::checker::{Checker, CompileResult};
-use crate::java_env::JavaEnv;
+use crate::checker::CompileResult;
 use crate::judge;
+use crate::lang::{Build, Language};
 use crate::model::{Meta, TestCase};
 use crate::proc::{self, Termination};
 use crate::sandbox;
 use crate::store::Settings;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 pub const KEEP_RUNS: usize = 20;
@@ -30,6 +28,13 @@ pub struct RunRequest {
     pub tests: Vec<TestCase>,
     #[serde(default)]
     pub any_order: bool,
+    /// "java" or "rust".
+    #[serde(default = "default_language")]
+    pub language: String,
+}
+
+fn default_language() -> String {
+    "java".into()
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -99,8 +104,11 @@ pub struct ProcessInfo {
     pub elapsed_ms: u64,
     pub stderr: String,
     pub sandboxed: bool,
-    pub java_guard: bool,
-    pub java_version: String,
+    /// The Java guard (SecurityManager) was active. Always false for Rust.
+    pub guard: bool,
+    /// e.g. "Java 17.0.8" or "rustc 1.96.0".
+    pub toolchain: String,
+    pub language: String,
     pub command: String,
 }
 
@@ -109,6 +117,7 @@ pub struct ProcessInfo {
 pub struct RunReport {
     pub run_id: String,
     pub slug: String,
+    pub language: String,
     pub started_at: String,
     pub verdict: Verdict,
     pub summary: String,
@@ -121,7 +130,6 @@ pub struct RunReport {
 }
 
 static COUNTER: AtomicU32 = AtomicU32::new(0);
-static FRAME_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\(([A-Za-z0-9_$]+\.java):(\d+)\)").unwrap());
 
 pub fn new_run_id() -> String {
     let n = COUNTER.fetch_add(1, Ordering::SeqCst) % 1000;
@@ -138,31 +146,6 @@ fn clean_stderr(s: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-/// Rewrites `Solution.java:N` to the user's line numbers and returns the first one.
-fn map_trace(trace: &[String], file_name: &str) -> (Vec<String>, Option<i64>) {
-    let mut first = None;
-    let mapped = trace
-        .iter()
-        .map(|f| {
-            FRAME_LINE
-                .replace_all(f, |c: &regex::Captures| {
-                    let n: i64 = c[2].parse().unwrap_or(0);
-                    if &c[1] == file_name {
-                        let user = (n - crate::support::PREFIX_LINES).max(1);
-                        if first.is_none() {
-                            first = Some(user);
-                        }
-                        format!("({}:{})", &c[1], user)
-                    } else {
-                        c[0].to_string()
-                    }
-                })
-                .to_string()
-        })
-        .collect();
-    (mapped, first)
 }
 
 fn job_file(meta: &Meta, tests: &[TestCase]) -> String {
@@ -189,21 +172,6 @@ fn job_file(meta: &Meta, tests: &[TestCase]) -> String {
     s
 }
 
-fn jvm_args(java: &JavaEnv, settings: &Settings) -> Vec<String> {
-    let mut a = vec![
-        format!("-Xmx{}m", settings.memory_mb),
-        "-XX:+UseSerialGC".into(),
-        "-XX:-UsePerfData".into(),
-        "-Xshare:auto".into(),
-        "-Dfile.encoding=UTF-8".into(),
-        "-Djava.awt.headless=true".into(),
-    ];
-    if java.supports_security_manager() {
-        a.push("-Djava.security.manager=allow".into());
-    }
-    a
-}
-
 fn shell_words(args: &[String]) -> String {
     args.iter()
         .map(|a| if a.contains(' ') || a.contains('(') || a.contains('"') { format!("'{}'", a.replace('\'', "'\\''")) } else { a.clone() })
@@ -223,11 +191,16 @@ pub fn prune_runs(runs_dir: &Path, keep: usize) {
 }
 
 pub struct RunEnv<'a> {
-    pub java: &'a JavaEnv,
-    pub support: &'a Path,
+    pub lang: &'a dyn Language,
     pub runs_dir: &'a Path,
     pub settings: &'a Settings,
-    pub checker: &'a Mutex<Option<Checker>>,
+}
+
+/// What a crashed process left in the per-test capture file (Rust runs only).
+fn crash_output(run_dir: &Path) -> String {
+    std::fs::read(run_dir.join("case-output.txt"))
+        .map(|b| String::from_utf8_lossy(&b[..b.len().min(64 * 1024)]).to_string())
+        .unwrap_or_default()
 }
 
 pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
@@ -235,14 +208,16 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
     let run_id = new_run_id();
     let started_at = chrono::Local::now().to_rfc3339();
     let run_dir = env.runs_dir.join(&run_id);
-    let file_name = req.meta.file_name();
+    let lang = env.lang;
+    let file_name = lang.file_name(&req.meta);
     let labels = req.meta.input_labels();
     let per = req.meta.lines_per_test();
-    log::info!("run {run_id}: start slug={} tests={} file={file_name} java={} timeout={}s mem={}MB", req.slug, req.tests.len(), env.java.version, env.settings.timeout_secs, env.settings.memory_mb);
+    log::info!("run {run_id}: start slug={} tests={} file={file_name} toolchain={} timeout={}s mem={}MB", req.slug, req.tests.len(), lang.toolchain(), env.settings.timeout_secs, env.settings.memory_mb);
 
     let mut report = RunReport {
         run_id: run_id.clone(),
         slug: req.slug.clone(),
+        language: lang.id().to_string(),
         started_at,
         verdict: Verdict::InternalError,
         summary: String::new(),
@@ -309,54 +284,40 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
         return finish(report, started);
     }
 
-    // ---- compile (holds the checker lock only for this step)
-    let compile = {
-        let mut guard = env.checker.lock().unwrap_or_else(|p| p.into_inner());
-        match guard.as_mut() {
-            Some(c) => c.compile(&file_name, &req.code, Some(&run_dir), Duration::from_secs(30)),
-            None => Err("the compiler is not running (no JDK found)".into()),
+    // ---- build (language specific)
+    if let Err(e) = std::fs::write(run_dir.join("job.txt"), job_file(&req.meta, &req.tests)) {
+        report.message = Some(format!("cannot write job file: {e}"));
+        return finish(report, started);
+    }
+    let (compile, program, args, exec_dir) = match lang.build(req, &run_dir, env.settings) {
+        Build::Ready { compile, program, args, exec_dir } => (compile, program, args, exec_dir),
+        Build::Failed(compile) => {
+            log::info!("run {run_id}: compiled ok=false in {} ms, {} diagnostics", compile.ms, compile.diagnostics.len());
+            for d in compile.diagnostics.iter().filter(|d| d.severity == "error").take(5) {
+                log::info!("run {run_id}: compile error line {}: {}", d.line, d.message.lines().next().unwrap_or(""));
+            }
+            let n = compile.diagnostics.iter().filter(|d| d.severity == "error").count();
+            report.summary = format!("{n} error{}", if n == 1 { "" } else { "s" });
+            report.compile = Some(compile);
+            report.verdict = Verdict::CompileError;
+            return finish(report, started);
         }
-    };
-    let compile = match compile {
-        Ok(c) => c,
-        Err(e) => {
-            report.message = Some(format!("Compiler problem: {e}"));
-            log::error!("run {run_id}: compile infrastructure error: {e}");
+        Build::Fatal(msg) => {
+            log::error!("run {run_id}: build problem: {msg}");
+            report.message = Some(msg);
             return finish(report, started);
         }
     };
-    log::info!("run {run_id}: compiled ok={} in {} ms, {} diagnostics", compile.ok, compile.ms, compile.diagnostics.len());
-    let compiled_ok = compile.ok;
-    if !compiled_ok {
-        for d in compile.diagnostics.iter().filter(|d| d.severity == "error").take(5) {
-            log::info!("run {run_id}: compile error line {}: {}", d.line, d.message.lines().next().unwrap_or(""));
-        }
-    }
+    log::info!("run {run_id}: compiled ok in {} ms", compile.ms);
     report.compile = Some(compile);
-    if !compiled_ok {
-        report.verdict = Verdict::CompileError;
-        let n = report.compile.as_ref().unwrap().diagnostics.iter().filter(|d| d.severity == "error").count();
-        report.summary = format!("{n} error{}", if n == 1 { "" } else { "s" });
-        return finish(report, started);
-    }
     if cancel.load(Ordering::SeqCst) {
         report.verdict = Verdict::Cancelled;
         return finish(report, started);
     }
 
     // ---- execute
-    let job = job_file(&req.meta, &req.tests);
-    if let Err(e) = std::fs::write(run_dir.join("job.txt"), job) {
-        report.message = Some(format!("cannot write job file: {e}"));
-        return finish(report, started);
-    }
-    let mut args = jvm_args(env.java, env.settings);
-    args.push("-cp".into());
-    args.push(format!("{}:{}", run_dir.display(), env.support.display()));
-    args.push("PwDriver".into());
-    args.push("job.txt".into());
-    args.push("results.jsonl".into());
-    let (mut cmd, sandboxed) = sandbox::command(&env.java.java, &env.java.home, &run_dir);
+    let exec_dir = std::fs::canonicalize(&exec_dir).unwrap_or(exec_dir);
+    let (mut cmd, sandboxed) = sandbox::command(&program, &exec_dir, &run_dir);
     cmd.args(&args)
         .current_dir(&run_dir)
         .env_clear()
@@ -364,10 +325,10 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
         .env("LANG", "en_US.UTF-8")
         .env("HOME", &run_dir)
         .env("TMPDIR", &run_dir);
-    let command_line = format!("{}{} {}", if sandboxed { "sandbox-exec -p <profile> " } else { "" }, env.java.java.display(), shell_words(&args));
+    let command_line = format!("{}{} {}", if sandboxed { "sandbox-exec -p <profile> " } else { "" }, program.display(), shell_words(&args));
     log::debug!("run {run_id}: {command_line}");
     if !sandboxed {
-        log::warn!("run {run_id}: sandbox-exec unavailable, running with process limits and the Java guard only");
+        log::warn!("run {run_id}: sandbox-exec unavailable, running with process limits only");
     }
     let timeout = Duration::from_secs(env.settings.timeout_secs);
     let limits = proc::Limits {
@@ -381,7 +342,7 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
     let pr = match proc::run(cmd, &limits, cancel) {
         Ok(p) => p,
         Err(e) => {
-            report.message = Some(format!("could not start Java: {e}"));
+            report.message = Some(format!("could not start {}: {e}", lang.name()));
             log::error!("run {run_id}: spawn failed: {e}");
             return finish(report, started);
         }
@@ -431,7 +392,7 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
                 } else {
                     let kind = v["errorKind"].as_str().unwrap_or("exception").to_string();
                     let trace: Vec<String> = v["trace"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
-                    let (trace, line) = map_trace(&trace, &file_name);
+                    let (trace, line) = lang.map_trace(&trace, &file_name);
                     c.status = match kind.as_str() {
                         "memory" => CaseStatus::Memory,
                         "blocked" => CaseStatus::Blocked,
@@ -457,16 +418,29 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
                 report.cases[i].status = CaseStatus::Timeout;
                 report.cases[i].error = Some(format!("Still running after {}s (infinite loop or too slow). The program was stopped.", env.settings.timeout_secs));
             } else if !ended {
-                report.message = Some(format!("Java did not finish within {}s.", env.settings.timeout_secs));
+                report.message = Some(format!("{} did not finish within {}s.", lang.name(), env.settings.timeout_secs));
             }
         }
         Termination::Signaled { signal, name } => {
-            let status = if *signal == libc::SIGXCPU { CaseStatus::Timeout } else if *signal == libc::SIGXFSZ { CaseStatus::OutputLimit } else { CaseStatus::Error };
+            let mut status = if *signal == libc::SIGXCPU { CaseStatus::Timeout } else if *signal == libc::SIGXFSZ { CaseStatus::OutputLimit } else { CaseStatus::Error };
             if let Some(i) = in_progress {
-                report.cases[i].status = status;
-                report.cases[i].error = Some(format!("The program was killed by {name}."));
+                // A native program (Rust) writes why it aborted into the capture file.
+                let printed = crash_output(&run_dir);
+                let mut why = format!("The program was killed by {name}.");
+                if printed.contains("memory allocation of") {
+                    status = CaseStatus::Memory;
+                    why = format!("Used more than {} MB of memory.", env.settings.memory_mb);
+                } else if printed.contains("has overflowed its stack") {
+                    why = "Stack overflow: the recursion went too deep.".into();
+                }
+                let c = &mut report.cases[i];
+                c.status = status;
+                c.error = Some(why);
+                if c.stdout.is_empty() && !printed.is_empty() {
+                    c.stdout = printed;
+                }
             } else {
-                report.message = Some(format!("Java was killed by {name}."));
+                report.message = Some(format!("{} was killed by {name}.", lang.name()));
             }
         }
         Termination::OutputLimit => {
@@ -487,7 +461,7 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
         }
         Termination::Exited { code } => {
             if !ended && fatal.is_none() {
-                report.message = Some(format!("Java exited with code {code} before finishing.{}", if stderr.trim().is_empty() { String::new() } else { " See the details below.".into() }));
+                report.message = Some(format!("{} exited with code {code} before finishing.{}", lang.name(), if stderr.trim().is_empty() { String::new() } else { " See the details below.".into() }));
             }
         }
     }
@@ -497,8 +471,9 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
         elapsed_ms: pr.elapsed_ms,
         stderr,
         sandboxed,
-        java_guard: guard_on,
-        java_version: env.java.version.clone(),
+        guard: guard_on,
+        toolchain: lang.toolchain(),
+        language: lang.id().to_string(),
         command: command_line,
     });
 
@@ -536,8 +511,13 @@ pub fn run(env: &RunEnv, req: &RunRequest, cancel: &AtomicBool) -> RunReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::checker::Checker;
+    use crate::java_env::JavaEnv;
+    use crate::lang::{java::Java, rust::Rust};
     use crate::model::Param;
-    use crate::{java_env, support};
+    use crate::{java_env, rust_env, support};
+    use std::path::PathBuf;
+    use std::sync::Mutex;
 
     struct Fixture {
         _dir: tempfile::TempDir,
@@ -545,6 +525,7 @@ mod tests {
         support: PathBuf,
         runs: PathBuf,
         checker: Mutex<Option<Checker>>,
+        rust_lock: Mutex<()>,
     }
 
     fn fixture() -> Fixture {
@@ -553,7 +534,7 @@ mod tests {
         let support = support::ensure_compiled(&java, dir.path()).unwrap();
         let checker = Checker::new(java.clone(), support.clone(), dir.path().join("scratch"));
         let runs = dir.path().join("runs");
-        Fixture { java, support, runs, checker: Mutex::new(Some(checker)), _dir: dir }
+        Fixture { java, support, runs, checker: Mutex::new(Some(checker)), rust_lock: Mutex::new(()), _dir: dir }
     }
 
     fn func(method: &str, params: &[(&str, &str)], output_param: Option<usize>) -> Meta {
@@ -571,8 +552,17 @@ mod tests {
 
     fn go(f: &Fixture, meta: Meta, code: &str, tests: Vec<TestCase>, timeout: u64) -> RunReport {
         let settings = Settings { timeout_secs: timeout, ..Settings::default() };
-        let env = RunEnv { java: &f.java, support: &f.support, runs_dir: &f.runs, settings: &settings, checker: &f.checker };
-        let req = RunRequest { slug: "t".into(), code: code.into(), meta, tests, any_order: false };
+        let java = Java { env: f.java.clone(), support: f.support.clone(), checker: &f.checker };
+        let env = RunEnv { lang: &java, runs_dir: &f.runs, settings: &settings };
+        let req = RunRequest { slug: "t".into(), code: code.into(), meta, tests, any_order: false, language: "java".into() };
+        run(&env, &req, &AtomicBool::new(false))
+    }
+
+    fn go_rust(f: &Fixture, meta: Meta, code: &str, tests: Vec<TestCase>, timeout: u64) -> RunReport {
+        let settings = Settings { timeout_secs: timeout, ..Settings::default() };
+        let rust = Rust { env: rust_env::detect().unwrap(), work: f.runs.join("rust-check"), lock: &f.rust_lock };
+        let env = RunEnv { lang: &rust, runs_dir: &f.runs, settings: &settings };
+        let req = RunRequest { slug: "t".into(), code: code.into(), meta, tests, any_order: false, language: "rust".into() };
         run(&env, &req, &AtomicBool::new(false))
     }
 
@@ -741,7 +731,7 @@ mod tests {
         assert_eq!(listed, ["Count Target"]);
         let ws = store.load("count-target").unwrap();
         assert_eq!(ws.tests.len(), 4);
-        assert!(ws.code.contains("countTarget"));
+        assert!(ws.codes["java"].contains("countTarget"));
 
         let solved = "class Solution {\n    public int countTarget(int[] nums, int target) {\n        int n = 0;\n        for (int x : nums) if (x == target) n++;\n        return n;\n    }\n}\n";
         let r = go(&f, ws.problem.meta.clone().unwrap(), solved, ws.tests.clone(), 10);
@@ -752,8 +742,127 @@ mod tests {
         assert_eq!(r.cases[3].output.as_deref(), Some("2"));
 
         // The untouched starter code is a compile error, as the tutorial says.
-        let r = go(&f, ws.problem.meta.clone().unwrap(), &ws.code, ws.tests.clone(), 10);
+        let r = go(&f, ws.problem.meta.clone().unwrap(), &ws.codes["java"], ws.tests.clone(), 10);
         assert_eq!(r.verdict, Verdict::CompileError);
+    }
+
+    // ---------------------------------------------------------------- Rust
+
+    const RUST_TWO_SUM: &str = "impl Solution {\n    pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {\n        let mut seen = HashMap::new();\n        for (i, &x) in nums.iter().enumerate() {\n            if let Some(&j) = seen.get(&(target - x)) {\n                return vec![j as i32, i as i32];\n            }\n            seen.insert(x, i);\n        }\n        vec![]\n    }\n}\n";
+
+    #[test]
+    fn rust_two_sum_accepted_and_sandboxed() {
+        let f = fixture();
+        let r = go_rust(&f, func("twoSum", &[("nums", "integer[]"), ("target", "integer")], None), RUST_TWO_SUM,
+            vec![tc(&["[2,7,11,15]", "9"], Some("[0,1]")), tc(&["[3,2,4]", "6"], Some("[1,2]")), tc(&["[3,3]", "6"], Some("[0,1]"))], 10);
+        assert_eq!(r.verdict, Verdict::Accepted, "{r:#?}");
+        let p = r.process.unwrap();
+        assert_eq!(p.sandboxed, sandbox::available());
+        assert_eq!(p.language, "rust");
+        assert!(p.toolchain.starts_with("rustc "));
+    }
+
+    #[test]
+    fn rust_wrong_answer_stdout_and_compile_errors() {
+        let f = fixture();
+        let code = "impl Solution {\n    pub fn add(a: i32, b: i32) -> i32 {\n        println!(\"a={}\", a);\n        a - b\n    }\n}\n";
+        let r = go_rust(&f, func("add", &[("a", "integer"), ("b", "integer")], None), code, vec![tc(&["1", "1"], Some("2")), tc(&["5", "0"], Some("5"))], 10);
+        assert_eq!(r.verdict, Verdict::WrongAnswer, "{r:#?}");
+        assert_eq!(r.cases[0].output.as_deref(), Some("0"));
+        assert_eq!(r.cases[0].stdout, "a=1\n");
+        assert_eq!(r.cases[1].status, CaseStatus::Passed);
+
+        let bad = "impl Solution {\n    pub fn add(a: i32, b: i32) -> i32 {\n        let s: String = a;\n        a + b\n    }\n}\n";
+        let r = go_rust(&f, func("add", &[("a", "integer"), ("b", "integer")], None), bad, vec![tc(&["1", "1"], Some("2"))], 10);
+        assert_eq!(r.verdict, Verdict::CompileError, "{r:#?}");
+        assert_eq!(r.compile.unwrap().diagnostics[0].line, 3);
+
+        // Untouched LeetCode starter code: the empty body doesn't return a value.
+        let starter = "impl Solution {\n    pub fn add(a: i32, b: i32) -> i32 {\n        \n    }\n}";
+        let r = go_rust(&f, func("add", &[("a", "integer"), ("b", "integer")], None), starter, vec![tc(&["1", "1"], None)], 10);
+        assert_eq!(r.verdict, Verdict::CompileError);
+    }
+
+    #[test]
+    fn rust_panic_line_and_infinite_loop() {
+        let f = fixture();
+        let code = "impl Solution {\n    pub fn f(a: Vec<i32>) -> i32 {\n        if a.len() == 3 { loop {} }\n        a[5]\n    }\n}\n";
+        let r = go_rust(&f, func("f", &[("a", "integer[]")], None), code, vec![tc(&["[1,2]"], Some("1")), tc(&["[1,2,3]"], None), tc(&["[1]"], None)], 2);
+        assert_eq!(r.verdict, Verdict::RuntimeError, "{r:#?}");
+        assert_eq!(r.cases[0].error_line, Some(4), "{:?}", r.cases[0]);
+        assert!(r.cases[0].error.as_ref().unwrap().contains("index out of bounds"));
+        assert_eq!(r.cases[1].status, CaseStatus::Timeout);
+        assert_eq!(r.cases[2].status, CaseStatus::NotRun);
+    }
+
+    #[test]
+    fn rust_lists_trees_in_place_design_and_types() {
+        let f = fixture();
+        let add = "impl Solution {\n    pub fn add_two_numbers(l1: Option<Box<ListNode>>, l2: Option<Box<ListNode>>) -> Option<Box<ListNode>> {\n        let (mut a, mut b, mut carry) = (l1, l2, 0);\n        let mut dummy = Box::new(ListNode::new(0));\n        let mut tail = &mut dummy;\n        while a.is_some() || b.is_some() || carry > 0 {\n            let mut s = carry;\n            if let Some(n) = a { s += n.val; a = n.next; }\n            if let Some(n) = b { s += n.val; b = n.next; }\n            carry = s / 10;\n            tail.next = Some(Box::new(ListNode::new(s % 10)));\n            tail = tail.next.as_mut().unwrap();\n        }\n        dummy.next\n    }\n}\n";
+        let r = go_rust(&f, func("addTwoNumbers", &[("l1", "ListNode"), ("l2", "ListNode")], None), add,
+            vec![tc(&["[2,4,3]", "[5,6,4]"], Some("[7,0,8]")), tc(&["[9,9,9,9,9,9,9]", "[9,9,9,9]"], Some("[8,9,9,9,0,0,0,1]")), tc(&["[0]", "[0]"], Some("[0]"))], 10);
+        assert_eq!(r.verdict, Verdict::Accepted, "{r:#?}");
+
+        let inv = "use std::rc::Rc;\nuse std::cell::RefCell;\nimpl Solution {\n    pub fn invert_tree(root: Option<Rc<RefCell<TreeNode>>>) -> Option<Rc<RefCell<TreeNode>>> {\n        if let Some(n) = root.clone() {\n            let mut b = n.borrow_mut();\n            let l = b.left.take();\n            let r = b.right.take();\n            b.left = Self::invert_tree(r);\n            b.right = Self::invert_tree(l);\n        }\n        root\n    }\n}\n";
+        let r = go_rust(&f, func("invertTree", &[("root", "TreeNode")], None), inv,
+            vec![tc(&["[4,2,7,1,3,6,9]"], Some("[4,7,2,9,6,3,1]")), tc(&["[]"], Some("[]")), tc(&["[1,null,2]"], Some("[1,2]"))], 10);
+        assert_eq!(r.verdict, Verdict::Accepted, "{r:#?}");
+
+        let rot = "impl Solution {\n    pub fn rotate(nums: &mut Vec<i32>, k: i32) {\n        let n = nums.len();\n        let k = k as usize % n;\n        nums.rotate_right(k);\n    }\n}\n";
+        let r = go_rust(&f, func("rotate", &[("nums", "integer[]"), ("k", "integer")], Some(0)), rot,
+            vec![tc(&["[1,2,3,4,5,6,7]", "3"], Some("[5,6,7,1,2,3,4]"))], 10);
+        assert_eq!(r.verdict, Verdict::Accepted, "{r:#?}");
+
+        let med = "impl Solution {\n    pub fn find_median_sorted_arrays(nums1: Vec<i32>, nums2: Vec<i32>) -> f64 {\n        let mut m = [nums1, nums2].concat();\n        m.sort();\n        let n = m.len();\n        if n % 2 == 1 { m[n / 2] as f64 } else { (m[n / 2 - 1] + m[n / 2]) as f64 / 2.0 }\n    }\n}\n";
+        let r = go_rust(&f, func("findMedianSortedArrays", &[("nums1", "integer[]"), ("nums2", "integer[]")], None), med,
+            vec![tc(&["[1,3]", "[2]"], Some("2.00000")), tc(&["[1,2]", "[3,4]"], Some("2.50000"))], 10);
+        assert_eq!(r.verdict, Verdict::Accepted, "{r:#?}");
+
+        let lru = "use std::collections::HashMap;\nstruct LRUCache { cap: usize, tick: u64, m: HashMap<i32, (i32, u64)> }\nimpl LRUCache {\n    fn new(capacity: i32) -> Self { LRUCache { cap: capacity as usize, tick: 0, m: HashMap::new() } }\n    fn get(&mut self, key: i32) -> i32 {\n        self.tick += 1;\n        let t = self.tick;\n        match self.m.get_mut(&key) { Some(e) => { e.1 = t; e.0 } None => -1 }\n    }\n    fn put(&mut self, key: i32, value: i32) {\n        self.tick += 1;\n        if !self.m.contains_key(&key) && self.m.len() == self.cap {\n            let old = *self.m.iter().min_by_key(|(_, v)| v.1).unwrap().0;\n            self.m.remove(&old);\n        }\n        self.m.insert(key, (value, self.tick));\n    }\n}\n";
+        let meta = Meta::Design { class_name: "LRUCache".into(), constructor_params: vec![Param { name: "capacity".into(), ty: "integer".into() }], methods: vec!["get".into(), "put".into()] };
+        let r = go_rust(&f, meta, lru, vec![tc(&[
+            "[\"LRUCache\",\"put\",\"put\",\"get\",\"put\",\"get\",\"put\",\"get\",\"get\",\"get\"]",
+            "[[2],[1,1],[2,2],[1],[3,3],[2],[4,4],[1],[3],[4]]",
+        ], Some("[null, null, null, 1, null, -1, null, -1, 3, 4]"))], 10);
+        assert_eq!(r.verdict, Verdict::Accepted, "{r:#?}");
+
+        let mix = "impl Solution {\n    pub fn f(board: Vec<Vec<char>>, words: Vec<String>, big: i64, s: String) -> Vec<Vec<String>> {\n        assert_eq!(board[0][1], '.');\n        assert_eq!(big, 10000000000);\n        vec![words, vec![s]]\n    }\n}\n";
+        let r = go_rust(&f, func("f", &[("board", "character[][]"), ("words", "string[]"), ("big", "long"), ("s", "string")], None), mix,
+            vec![tc(&["[[\"5\",\".\"]]", "[\"eat\",\"tea\"]", "10000000000", "\"hi\\\"\""], Some("[[\"eat\",\"tea\"],[\"hi\\\"\"]]"))], 10);
+        assert_eq!(r.verdict, Verdict::Accepted, "{r:#?}");
+    }
+
+    #[test]
+    fn rust_sandbox_memory_stack_and_bad_input() {
+        let f = fixture();
+        let home = std::env::var("HOME").unwrap();
+        let target = format!("{home}/sweepcode-rust-should-not-exist.txt");
+        let code = format!("impl Solution {{\n    pub fn f(k: i32) -> i32 {{\n        if k == 0 {{ std::fs::write(\"{target}\", \"x\").unwrap(); }}\n        if k == 1 {{ std::process::Command::new(\"/usr/bin/touch\").arg(\"{target}\").status().unwrap(); }}\n        if k == 2 {{ std::net::TcpStream::connect(\"1.1.1.1:80\").unwrap(); }}\n        k\n    }}\n}}\n");
+        let r = go_rust(&f, func("f", &[("k", "integer")], None), &code, vec![tc(&["0"], None), tc(&["1"], None), tc(&["2"], None), tc(&["3"], Some("3"))], 10);
+        for i in 0..3 {
+            assert!(matches!(r.cases[i].status, CaseStatus::Blocked | CaseStatus::Error), "case {i}: {:?}", r.cases[i]);
+        }
+        assert_eq!(r.cases[3].status, CaseStatus::Passed);
+        assert!(!Path::new(&target).exists());
+
+        let mem = "impl Solution {\n    pub fn f(k: i32) -> i32 {\n        let mut v: Vec<Vec<u8>> = Vec::new();\n        loop { v.push(vec![1u8; 1 << 20]); }\n    }\n}\n";
+        let r = go_rust(&f, func("f", &[("k", "integer")], None), mem, vec![tc(&["1"], None), tc(&["2"], None)], 20);
+        assert_eq!(r.verdict, Verdict::MemoryLimitExceeded, "{r:#?}");
+        assert_eq!(r.cases[0].status, CaseStatus::Memory);
+
+        let deep = "impl Solution {\n    pub fn f(k: i32) -> i32 {\n        if k == 0 { 0 } else { 1 + Self::f(k - 1) }\n    }\n}\n";
+        let r = go_rust(&f, func("f", &[("k", "integer")], None), deep, vec![tc(&["100000"], Some("100000")), tc(&["2000000000"], None)], 20);
+        assert_eq!(r.cases[0].status, CaseStatus::Passed, "{:?}", r.cases[0]);
+        assert_eq!(r.cases[1].status, CaseStatus::Error);
+        assert!(r.cases[1].error.as_ref().unwrap().contains("Stack overflow"), "{:?}", r.cases[1]);
+
+        let r = go_rust(&f, func("twoSum", &[("nums", "integer[]"), ("target", "integer")], None), RUST_TWO_SUM, vec![tc(&["[2,7", "9"], None)], 10);
+        assert_eq!(r.verdict, Verdict::InvalidInput);
+        assert!(r.cases[0].error.as_ref().unwrap().contains("nums"));
+
+        let r = go_rust(&f, func("threeSum", &[("nums", "integer[]")], None), RUST_TWO_SUM, vec![tc(&["[1]"], None)], 10);
+        assert_eq!(r.verdict, Verdict::InternalError);
+        assert!(r.message.as_ref().unwrap().contains("three_sum"), "{:?}", r.message);
     }
 
     #[test]

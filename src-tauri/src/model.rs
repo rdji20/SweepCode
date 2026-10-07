@@ -60,6 +60,9 @@ pub struct Problem {
     pub paid_only: bool,
     pub content: String,
     pub java_code: Option<String>,
+    /// LeetCode's Rust starter code. Missing on problems saved before Rust support.
+    #[serde(default)]
+    pub rust_code: Option<String>,
     pub meta: Option<Meta>,
     pub examples: Vec<TestCase>,
     #[serde(default)]

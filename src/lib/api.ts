@@ -6,7 +6,7 @@ import { isTauri } from "./env";
 import { log, describeError } from "./log";
 import { mockInvoke } from "./mock";
 import type {
-  CompileResult, EnvInfo, LogTail, ProblemSummary, RunReport, RunRequest, Settings, StoredSummary, TestCase, Workspace,
+  CompileResult, EnvInfo, Lang, LogTail, ProblemSummary, RunReport, RunRequest, Settings, StoredSummary, TestCase, Workspace,
 } from "./types";
 
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -26,9 +26,10 @@ export const api = {
   fetchProblem: (input: string) => call<Workspace>("fetch_problem", { input }),
   searchProblems: (query: string) => call<ProblemSummary[]>("search_problems", { query }),
   deleteProblem: (slug: string) => call<void>("delete_problem", { slug }),
-  saveCode: (slug: string, code: string) => call<void>("save_code", { slug, code }),
+  saveCode: (slug: string, language: Lang, code: string) => call<void>("save_code", { slug, language, code }),
+  setLanguage: (slug: string, language: Lang) => call<void>("set_language", { slug, language }),
   saveTests: (slug: string, tests: TestCase[]) => call<void>("save_tests", { slug, tests }),
-  checkCode: (fileName: string, code: string) => call<CompileResult>("check_code", { fileName, code }),
+  checkCode: (language: Lang, fileName: string, code: string) => call<CompileResult>("check_code", { language, fileName, code }),
   runCode: (request: RunRequest) => call<RunReport>("run_code", { request }),
   cancelRun: () => call<void>("cancel_run"),
   getSettings: () => call<Settings>("get_settings"),

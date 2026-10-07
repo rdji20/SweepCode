@@ -227,7 +227,13 @@ body.resizing-column, body.resizing-column * { cursor: row-resize !important; }
 
 /* editor pane */
 .editor-head { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--line); }
-.file-tab { font-family: var(--mono); font-size: 13px; color: var(--text); }
+.file-tab { font-family: var(--mono); font-size: 13px; color: var(--dim); }
+.lang-switch { display: inline-flex; gap: 2px; margin-right: 6px; }
+.lang-btn { border: none; background: none; color: var(--dim); height: 24px; padding: 0 10px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.lang-btn:hover { color: var(--text); }
+.lang-btn.is-active { background: var(--pink-fill); color: var(--text); }
+.editor-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--dim); font-size: 14px; }
+select.input { padding-right: 6px; }
 .code-editor { flex: 1; min-height: 0; }
 .pw-runtime-error-line { background: #e277621f; }
 .pw-runtime-error-glyph { background: var(--bad); width: 3px !important; margin-left: 6px; }

@@ -112,7 +112,7 @@ function RunBlock(props: { report: RunReport; latest: boolean; onJump: (l: numbe
 
   return (
     <div className="wblock">
-      <div className="wblock-cmd">run {r.slug} <span className="dim">· {r.cases.length} test{r.cases.length === 1 ? "" : "s"}</span></div>
+      <div className="wblock-cmd">run {r.slug} <span className="dim">· {r.language === "rust" ? "Rust" : "Java"} · {r.cases.length} test{r.cases.length === 1 ? "" : "s"}</span></div>
       <div className="wblock-line">
         <span className={`tone-${tone} strong`}>{verdictLabel[r.verdict]}</span>
         <span className="dim">  {r.summary}  ·  {r.totalMs} ms</span>
@@ -152,8 +152,8 @@ function RunBlock(props: { report: RunReport; latest: boolean; onJump: (l: numbe
           {r.process && (
             <>
               <div className="wrow"><span className="wlabel">process</span><span className="wval">{terminationText(r.process.termination)} after {r.process.elapsedMs} ms</span></div>
-              <div className="wrow"><span className="wlabel">java</span><span className="wval">{r.process.javaVersion}</span></div>
-              <div className="wrow"><span className="wlabel">sandbox</span><span className="wval">{r.process.sandboxed ? "macOS sandbox on" : "macOS sandbox OFF"}, {r.process.javaGuard ? "java guard on" : "java guard off"}, time and memory limits on</span></div>
+              <div className="wrow"><span className="wlabel">toolchain</span><span className="wval">{r.process.toolchain}</span></div>
+              <div className="wrow"><span className="wlabel">sandbox</span><span className="wval">{r.process.sandboxed ? "macOS sandbox on" : "macOS sandbox OFF"}{r.process.language === "java" ? (r.process.guard ? ", java guard on" : ", java guard off") : ""}, time and memory limits on</span></div>
               <div className="wrow"><span className="wlabel">command</span><span className="wval dim">{r.process.command}</span></div>
               {r.process.stderr.trim() && (
                 <div className="wrow"><span className="wlabel tone-bad">stderr</span><span className="wval pre-wrap">{r.process.stderr}</span></div>

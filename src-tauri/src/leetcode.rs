@@ -144,11 +144,15 @@ pub fn problem_from_json(q: &Value) -> Problem {
     let s = |k: &str| q[k].as_str().unwrap_or("").to_string();
     let content = s("content");
     let meta = q["metaData"].as_str().and_then(|m| serde_json::from_str::<Value>(m).ok()).and_then(|m| parse_meta(&m));
-    let java_code = q["codeSnippets"]
-        .as_array()
-        .and_then(|a| a.iter().find(|c| c["langSlug"] == "java"))
-        .and_then(|c| c["code"].as_str())
-        .map(|c| c.to_string());
+    let snippet = |lang: &str| {
+        q["codeSnippets"]
+            .as_array()
+            .and_then(|a| a.iter().find(|c| c["langSlug"] == lang))
+            .and_then(|c| c["code"].as_str())
+            .map(|c| c.to_string())
+    };
+    let java_code = snippet("java");
+    let rust_code = snippet("rust");
     let examples = build_examples(&s("exampleTestcases"), meta.as_ref(), &content);
     let text = html_to_text(&content).to_lowercase();
     Problem {
@@ -159,6 +163,7 @@ pub fn problem_from_json(q: &Value) -> Problem {
         paid_only: q["isPaidOnly"].as_bool().unwrap_or(false),
         content,
         java_code,
+        rust_code,
         meta,
         examples,
         tags: q["topicTags"].as_array().map(|a| a.iter().filter_map(|t| t["name"].as_str().map(String::from)).collect()).unwrap_or_default(),
@@ -322,6 +327,7 @@ mod tests {
     async fn live_fetch_and_search() {
         let p = fetch("two-sum").await.unwrap();
         assert_eq!(p.examples.len(), 3);
+        assert!(p.rust_code.as_deref().unwrap().contains("pub fn two_sum"));
         assert_eq!(p.examples[0].expected.as_deref(), Some("[0,1]"));
         let lru = resolve("146").await.unwrap();
         assert_eq!(lru.slug, "lru-cache");

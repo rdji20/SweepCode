@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { editorOptions, monaco, templatesEnabled } from "../lib/monaco";
-import { TEMPLATES } from "../lib/templates";
+import { templatesFor } from "../lib/templates";
 import type { Diagnostic } from "../lib/types";
 
 export interface CodeEditorHandle {
@@ -20,7 +20,8 @@ function modelFor(slug: string, fileName: string, code: string): monaco.editor.I
   const key = `${slug}/${fileName}`;
   let m = models.get(key);
   if (!m || m.isDisposed()) {
-    m = monaco.editor.createModel(code, "java", monaco.Uri.parse(`file:///${slug}/${fileName}`));
+    const language = fileName.endsWith(".rs") ? "rust" : "java";
+    m = monaco.editor.createModel(code, language, monaco.Uri.parse(`file:///${slug}/${fileName}`));
     models.set(key, m);
   }
   return m;
@@ -107,7 +108,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, {
       if (word.endColumn !== pos.column) return;
       const lineBefore = model.getLineContent(pos.lineNumber).slice(0, word.startColumn - 1);
       if (/[.\w]$/.test(lineBefore)) return; // part of a longer expression like "x.map"
-      const t = TEMPLATES.find((x) => x.prefix === word.word);
+      const t = templatesFor(model.getLanguageId()).find((x) => x.prefix === word.word);
       if (!t) return;
       e.preventDefault();
       e.stopPropagation();

@@ -1,6 +1,6 @@
 # SweepCode
 
-Solve LeetCode problems in Java on your Mac, Warp style.
+Solve LeetCode problems in **Java or Rust** on your Mac, Warp style.
 Compiler errors are underlined as you type, nothing autocompletes, and Run
 checks your code against the examples like LeetCode does.
 
@@ -17,10 +17,17 @@ It runs on Apple Silicon and Intel Macs (macOS 11+).
    ```bash
    xattr -dr com.apple.quarantine /Applications/SweepCode.app
    ```
-3. Install a JDK 11 or newer if you don't have one:
+3. Install the language you'll use, if you don't have it.
+   Java needs a JDK 11 or newer:
 
    ```bash
    brew install openjdk@21
+   ```
+
+   Rust needs rustc 1.65 or newer:
+
+   ```bash
+   brew install rustup && rustup default stable
    ```
 
 ## Build from source
@@ -57,6 +64,25 @@ pnpm tauri build
 New to the app? A guided tour opens on first launch. Replay it any time from
 **Tour** in the sidebar or **Settings → Help → Show the tour**.
 
+### Java or Rust
+
+Each problem has a **Java / Rust** switch above the editor. Your Java and Rust
+solutions are saved separately, and the app remembers which language you used
+last for each problem. Set the default for new problems in Settings.
+
+Both languages get the same features: errors underlined as you type, runs in
+the same sandbox with the same limits, and the same results view. Rust starter
+code comes from LeetCode. Problems you saved before Rust support get it the
+first time you switch.
+
+How Rust runs work: your file (`solution.rs`) is checked with `rustc` in
+check-only mode (about 0.4 s). For a run, the app reads your method's signature,
+writes a small `main.rs` that parses each test into those exact types, and
+builds both with `rustc -C opt-level=1`. Panics show their message and your line
+number. Integer overflow panics instead of wrapping silently, which catches
+bugs early. Using too much memory stops with "Memory Limit Exceeded", and recursion
+that goes too deep stops with a stack overflow message.
+
 ### Declaration templates
 
 Nothing autocompletes while you type. The one exception you opt into: type a
@@ -64,6 +90,9 @@ short prefix and press **Tab** to write a declaration you don't remember the
 syntax for, then Tab through the type and name slots. Or press **⌘I** for a
 small popup right where you're typing, and search by what you mean ("heap", "2d", "hashmap", "graph"); Enter inserts it at
 your cursor. **⌃Space** shows the plain list. Turn them off in Settings. Edit or add your own in `src/lib/templates.ts`.
+Rust has its own set: `vec`, `arr`, `arr2`, `map`, `entry` (the `*map.entry(k).or_insert(0) += 1` idiom),
+`set`, `queue` (VecDeque), `pq` (min-heap with `Reverse`), `pqmax`, `chars`, `node` and `tree`
+(`Some(Rc::new(RefCell::new(TreeNode::new(0))))`), and more. The table below is the Java set.
 
 | Prefix | Expands to |
 | --- | --- |
@@ -108,6 +137,8 @@ Every run goes through three layers:
 3. **Java guard** (`src-tauri/java/PwDriver.java`, JDK 11–23): blocks
    `System.exit`, process launching, file writes and sockets, and reports them as
    "Blocked by sandbox".
+4. **Rust memory cap** (`src-tauri/rust-runtime/runtime.rs`): a counting
+   allocator stops the program at the memory limit from Settings.
 
 Infinite loops show up as **Time Limit Exceeded** on the exact test that hung.
 
@@ -119,20 +150,26 @@ Infinite loops show up as **Time Limit Exceeded** on the exact test that hung.
 - Each run keeps a folder with the code, job, raw results and `report.json`
   (last 20 runs): `~/Library/Caches/com.sweepcode.app/runs/`
 - Your problems, tests and code: `~/Library/Application Support/com.sweepcode.app/problems/`
-- **No JDK found**: set the JDK folder in Settings, then "Detect Java again".
+- **No JDK found**: set the JDK folder in Settings, then "Detect Java and Rust again".
+- **No Rust found**: install it (see Download), then "Detect Java and Rust again" in Settings.
 
 ## Layout
 
 ```
 src/                     React UI (Monaco editor, Warp theme in styles.css)
 src-tauri/src/           Rust backend
-  java_env.rs            find the JDK
-  checker.rs             warm compiler process for live errors
-  runner.rs              compile → run → judge pipeline
+  lang/mod.rs            the Language trait every language implements
+  lang/java.rs           Java: warm javac, reflection driver
+  lang/rust.rs           Rust: rustc check and build
+  lang/rust_codegen.rs   writes main.rs from your method signature
+  java_env.rs, rust_env.rs   find the JDK / rustc
+  checker.rs             warm Java compiler process
+  runner.rs              build → run → judge pipeline (shared by all languages)
   proc.rs, sandbox.rs    limits and sandbox
   leetcode.rs            LeetCode GraphQL client
   store.rs               problems, code, tests, settings on disk
-src-tauri/java/          driver and helper classes (ListNode, TreeNode, Pair)
+src-tauri/java/          Java driver and helper classes (ListNode, TreeNode, Pair)
+src-tauri/rust-runtime/  Rust prelude (ListNode, TreeNode) and runtime (parse, print, capture)
 STATUS.md                build checklist
 STYLE.md                 design decisions
 ```

@@ -74,6 +74,18 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done and verified
 - [x] 7c.2 Opens once on first launch; replay from Tour in the sidebar or Settings → Help → Show the tour
 - [x] 7c.3 Settings → Help → Open tutorial opens docs/TUTORIAL.md on GitHub
 
+## 9. Rust support
+- [x] 9.1 Measure rustc speed; prove the generated runner (panic capture with line, per-test stdout, memory cap, deep recursion)
+- [x] 9.2 `Language` trait: one interface, Java moved behind it, runner made language-neutral
+- [x] 9.3 Find the Rust toolchain (rustup, Homebrew, ~/.cargo)
+- [x] 9.4 Live check for Rust: rustc check-only with exact ranges in your file
+- [x] 9.5 Generated `main.rs` from your method signature: all LeetCode Rust types (Vec, String, char, i64, f64, `&mut Vec`, ListNode, TreeNode) and design problems
+- [x] 9.6 Run inside the same sandbox and limits; Rust panics, memory cap, stack overflow reported per test
+- [x] 9.7 Store Java and Rust code side by side; remember each problem's language; Rust starter code from LeetCode
+- [x] 9.8 UI: Java/Rust switch, Rust highlighting, Rust templates (Tab, ⌘I, ⌃Space), toolchain in Settings and bottom bar
+- [x] 9.9 Tests: same coverage as Java (accepted, wrong, compile error lines, panic line, TLE, lists/trees/in-place/design, sandbox blocks, memory, stack)
+- [~] 9.10 Docs, tour, run in the real Tauri app
+
 ## 8. Verification
 - [x] 8.1 Rust unit + integration tests pass
 - [x] 8.2 Frontend typechecks and builds
@@ -101,6 +113,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done and verified
 - Declaration templates: checked in the preview: `map`+Tab, slot editing, `arr2` linked type slots, plain Tab still indents, `p`+⌃Space lists only pq templates.
 
 - Distribution: `.github/workflows/macos.yml` (modeled on dealer-control-v2's Windows pipeline): macOS tests, then a universal (arm64 + x86_64) ad-hoc-signed `.dmg` with SHA-256 checksums and build.txt; `v*` tags publish a GitHub Release. Local universal build verified (lipo, codesign, hdiutil) and ran Accepted inside the sandbox. Public repo: https://github.com/rdji20/SweepCode. First CI run green.
+
+- Rust support (2026-10-07): `Language` trait (`lang/mod.rs`) with Java and Rust implementations; runner, sandbox, judge and UI shared. Rust check = rustc check-only via an `include!` wrapper so errors land on the user's own lines (~0.4 s). Runs = generated `main.rs` from the user's signature (exact types incl. `&mut Vec`), built with opt-level=1 (~0.4 s); runtime captures stdout per test with dup2, catches panics with location, caps memory with a counting allocator; crashes (OOM, stack overflow) mapped from the capture file. 51 Rust tests green (8 new Rust run tests: accepted, wrong answer + stdout, compile error lines, panic line, TLE, lists/trees/in-place/f64/design/char boards, sandbox blocks, memory, stack overflow, bad input, missing method). Real app: detects rustc 1.96.0 via Homebrew rustup. UI clicks in the real app not driven by me (window access declined).
 
 ## Not done / known limits
 - Not notarized: needs an Apple Developer ID ($99/yr). Until then users click "Open Anyway" once (README explains).

@@ -3,8 +3,9 @@
 import * as monaco from "monaco-editor/editor/editor.api";
 import "monaco-editor/features/register.all";
 import "monaco-editor/languages/definitions/java/register";
+import "monaco-editor/languages/definitions/rust/register";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
-import { TEMPLATES } from "./templates";
+import { templatesFor } from "./templates";
 
 (self as unknown as { MonacoEnvironment: monaco.Environment }).MonacoEnvironment = {
   getWorker: () => new EditorWorker(),
@@ -71,7 +72,6 @@ monaco.editor.defineTheme("warp-dark", {
 export function editorOptions(fontSize: number): monaco.editor.IStandaloneEditorConstructionOptions {
   return {
     theme: "warp-dark",
-    language: "java",
     fontFamily: '"Hack", Menlo, monospace',
     fontSize,
     lineHeight: Math.round(fontSize * 1.6),
@@ -120,13 +120,13 @@ export function templatesEnabled() {
 }
 
 // The template list. Nothing else is registered, so the popup can never suggest code.
-monaco.languages.registerCompletionItemProvider("java", {
+for (const lang of ["java", "rust"]) monaco.languages.registerCompletionItemProvider(lang, {
   provideCompletionItems(model, position, context) {
     if (!templatesOn || context.triggerKind !== monaco.languages.CompletionTriggerKind.Invoke) return { suggestions: [] };
     const word = model.getWordUntilPosition(position);
     const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
     return {
-      suggestions: TEMPLATES.map((t) => ({
+      suggestions: templatesFor(model.getLanguageId()).map((t) => ({
         label: { label: t.prefix, description: t.label },
         kind: monaco.languages.CompletionItemKind.Snippet,
         insertText: t.body,

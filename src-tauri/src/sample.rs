@@ -29,6 +29,7 @@ Return the indices of the two different elements whose sum equals <code>target</
         paid_only: false,
         content: content.into(),
         java_code: Some("class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        \n    }\n}".into()),
+        rust_code: Some("impl Solution {\n    pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {\n        \n    }\n}".into()),
         meta: Some(Meta::Function {
             method: "twoSum".into(),
             params: vec![

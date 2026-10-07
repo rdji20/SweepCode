@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { preview, searchTemplates, type Template } from "../lib/templates";
+import { preview, searchTemplates, templatesFor, type Template } from "../lib/templates";
 import { IconSearch } from "./Icons";
 
 const WIDTH = 340;
@@ -7,6 +7,7 @@ const MARGIN = 8;
 
 /** Small Liquid Glass popup that opens at the cursor (⌘I) to insert a declaration. */
 export function TemplatePalette(props: {
+  lang: string;
   anchor: { x: number; y: number; lineHeight: number };
   onPick: (t: Template) => void;
   onClose: () => void;
@@ -17,7 +18,7 @@ export function TemplatePalette(props: {
   const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
-  const results = useMemo(() => searchTemplates(q), [q]);
+  const results = useMemo(() => searchTemplates(q, templatesFor(props.lang)), [q, props.lang]);
 
   // Sit under the line being typed; flip above it near the bottom; never leave the window.
   useLayoutEffect(() => {

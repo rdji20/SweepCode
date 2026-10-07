@@ -23,11 +23,13 @@ pub struct Settings {
     pub java_home: Option<String>,
     /// Declaration templates (Tab after `map`, `list`, ...).
     pub templates: bool,
+    /// Language for problems you haven't picked one for: "java" or "rust".
+    pub default_language: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { timeout_secs: 10, memory_mb: 256, font_size: 14, check_delay_ms: 450, java_home: None, templates: true }
+        Settings { timeout_secs: 10, memory_mb: 256, font_size: 14, check_delay_ms: 450, java_home: None, templates: true, default_language: "java".into() }
     }
 }
 
@@ -39,6 +41,9 @@ impl Settings {
         self.font_size = self.font_size.clamp(10, 28);
         self.check_delay_ms = self.check_delay_ms.clamp(150, 3000);
         self.java_home = self.java_home.filter(|s| !s.trim().is_empty());
+        if !crate::lang::known(&self.default_language) {
+            self.default_language = "java".into();
+        }
         self
     }
 }
@@ -51,6 +56,8 @@ pub struct ProblemState {
     pub opened_at: i64,
     pub last_verdict: Option<String>,
     pub solved: bool,
+    /// Language last used for this problem ("java" / "rust"); None = the default.
+    pub language: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -71,7 +78,8 @@ pub struct StoredSummary {
 pub struct Workspace {
     pub problem: Problem,
     pub tests: Vec<TestCase>,
-    pub code: String,
+    /// Your code per language: {"java": "...", "rust": "..."}.
+    pub codes: std::collections::BTreeMap<String, String>,
     pub state: ProblemState,
 }
 
@@ -129,9 +137,21 @@ impl Store {
         Ok(self.root.join("problems").join(slug))
     }
 
-    fn code_path(&self, slug: &str, problem: &Problem) -> Result<PathBuf, String> {
-        let name = problem.meta.as_ref().map(|m| m.file_name()).unwrap_or_else(|| "Solution.java".into());
+    /// Java keeps LeetCode's class file name (Solution.java, LRUCache.java); Rust is solution.rs.
+    fn code_path(&self, slug: &str, problem: &Problem, lang: &str) -> Result<PathBuf, String> {
+        let name = match lang {
+            "rust" => crate::lang::rust::FILE.to_string(),
+            "java" => problem.meta.as_ref().map(|m| m.file_name()).unwrap_or_else(|| "Solution.java".into()),
+            other => return Err(format!("unknown language '{other}'")),
+        };
         Ok(self.dir(slug)?.join(name))
+    }
+
+    fn starter(problem: &Problem, lang: &str) -> Option<String> {
+        match lang {
+            "rust" => problem.rust_code.clone(),
+            _ => problem.java_code.clone(),
+        }
     }
 
     pub fn settings(&self) -> Settings {
@@ -152,9 +172,13 @@ impl Store {
         if !dir.join("tests.json").exists() {
             self.save_tests(&p.slug, &p.examples)?;
         }
-        let code = self.code_path(&p.slug, p)?;
-        if !code.exists() {
-            write_atomic(&code, p.java_code.clone().unwrap_or_default().as_bytes())?;
+        for lang in ["java", "rust"] {
+            let code = self.code_path(&p.slug, p, lang)?;
+            if !code.exists() {
+                if let Some(starter) = Self::starter(p, lang) {
+                    write_atomic(&code, starter.as_bytes())?;
+                }
+            }
         }
         self.update_state(&p.slug, |s| {
             if s.added_at == 0 {
@@ -167,14 +191,26 @@ impl Store {
         let dir = self.dir(slug)?;
         let problem: Problem = read_json(&dir.join("problem.json"))?;
         let tests: Vec<TestCase> = read_json(&dir.join("tests.json")).unwrap_or_else(|_| problem.examples.clone());
-        let code = std::fs::read_to_string(self.code_path(slug, &problem)?).unwrap_or_else(|_| problem.java_code.clone().unwrap_or_default());
+        let mut codes = std::collections::BTreeMap::new();
+        for lang in ["java", "rust"] {
+            let code = std::fs::read_to_string(self.code_path(slug, &problem, lang)?)
+                .unwrap_or_else(|_| Self::starter(&problem, lang).unwrap_or_default());
+            codes.insert(lang.to_string(), code);
+        }
         let state: ProblemState = read_json(&dir.join("state.json")).unwrap_or_default();
-        Ok(Workspace { problem, tests, code, state })
+        Ok(Workspace { problem, tests, codes, state })
     }
 
-    pub fn save_code(&self, slug: &str, code: &str) -> Result<(), String> {
+    pub fn save_code(&self, slug: &str, lang: &str, code: &str) -> Result<(), String> {
         let problem: Problem = read_json(&self.dir(slug)?.join("problem.json"))?;
-        write_atomic(&self.code_path(slug, &problem)?, code.as_bytes())
+        write_atomic(&self.code_path(slug, &problem, lang)?, code.as_bytes())
+    }
+
+    pub fn set_language(&self, slug: &str, lang: &str) -> Result<(), String> {
+        if !crate::lang::known(lang) {
+            return Err(format!("unknown language '{lang}'"));
+        }
+        self.update_state(slug, |s| s.language = Some(lang.to_string()))
     }
 
     pub fn save_tests(&self, slug: &str, tests: &[TestCase]) -> Result<(), String> {
@@ -267,6 +303,7 @@ mod tests {
             paid_only: false,
             content: String::new(),
             java_code: Some("class Solution {}".into()),
+            rust_code: Some("impl Solution {}".into()),
             meta: Some(Meta::Function { method: "twoSum".into(), params: vec![], return_type: "integer[]".into(), output_param: None }),
             examples: vec![TestCase { inputs: vec!["[1]".into()], expected: Some("[0]".into()) }],
             tags: vec![],
@@ -282,10 +319,15 @@ mod tests {
         let s = Store::new(d.path().to_path_buf()).unwrap();
         assert!(s.is_empty());
         s.save_problem(&problem()).unwrap();
-        s.save_code("two-sum", "class Solution { int x; }").unwrap();
+        s.save_code("two-sum", "java", "class Solution { int x; }").unwrap();
+        s.save_code("two-sum", "rust", "impl Solution { fn x() {} }").unwrap();
         s.save_problem(&problem()).unwrap();
         let w = s.load("two-sum").unwrap();
-        assert_eq!(w.code, "class Solution { int x; }");
+        assert_eq!(w.codes["java"], "class Solution { int x; }");
+        assert_eq!(w.codes["rust"], "impl Solution { fn x() {} }");
+        assert!(s.save_code("two-sum", "cobol", "x").is_err());
+        s.set_language("two-sum", "rust").unwrap();
+        assert_eq!(s.load("two-sum").unwrap().state.language.as_deref(), Some("rust"));
         assert_eq!(w.tests.len(), 1);
         s.set_verdict("two-sum", "accepted").unwrap();
         let l = s.list();
@@ -325,12 +367,12 @@ mod tests {
         let new = root.path().join("com.sweepcode.app");
         let s = Store::new(old.clone()).unwrap();
         s.save_problem(&problem()).unwrap();
-        s.save_code("two-sum", "class Solution { /* mine */ }").unwrap();
+        s.save_code("two-sum", "java", "class Solution { /* mine */ }").unwrap();
 
         assert!(migrate_legacy_data(&old, &new).unwrap());
         assert!(!old.exists());
         let moved = Store::new(new.clone()).unwrap();
-        assert_eq!(moved.load("two-sum").unwrap().code, "class Solution { /* mine */ }");
+        assert_eq!(moved.load("two-sum").unwrap().codes["java"], "class Solution { /* mine */ }");
 
         // Second launch: nothing to do.
         assert!(!migrate_legacy_data(&old, &new).unwrap());

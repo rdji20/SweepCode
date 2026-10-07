@@ -1,10 +1,12 @@
 pub mod checker;
 pub mod java_env;
 pub mod judge;
+pub mod lang;
 pub mod leetcode;
 pub mod model;
 pub mod proc;
 pub mod runner;
+pub mod rust_env;
 pub mod sample;
 pub mod sandbox;
 pub mod store;
@@ -12,6 +14,8 @@ pub mod support;
 
 use checker::{Checker, CompileResult};
 use java_env::JavaEnv;
+use lang::{java::Java, rust::Rust, Language};
+use rust_env::RustEnv;
 use model::{ProblemSummary, TestCase};
 use runner::{RunEnv, RunReport, RunRequest};
 use serde::Serialize;
@@ -44,6 +48,8 @@ pub struct Inner {
     pub support: Mutex<Option<PathBuf>>,
     pub checker: Mutex<Option<Checker>>,
     pub compiler_ready: AtomicBool,
+    pub rust: Mutex<Result<RustEnv, String>>,
+    pub rust_lock: Mutex<()>,
     pub run_lock: Mutex<()>,
     pub cancel: Mutex<Option<Arc<AtomicBool>>>,
 }
@@ -58,13 +64,18 @@ pub struct EnvInfo {
     pub compiler_ready: bool,
     pub sandbox: bool,
     pub java_guard: bool,
+    pub rust: Option<RustEnv>,
+    pub rust_error: Option<String>,
     pub paths: Paths,
     pub app_version: String,
 }
 
 fn env_info(inner: &Inner) -> EnvInfo {
     let java = inner.java.lock().unwrap().clone();
+    let rust = inner.rust.lock().unwrap().clone();
     EnvInfo {
+        rust: rust.as_ref().ok().cloned(),
+        rust_error: rust.err(),
         java_guard: java.as_ref().map(|j| j.supports_security_manager()).unwrap_or(false),
         java: java.as_ref().ok().cloned(),
         java_error: java.err(),
@@ -78,6 +89,13 @@ fn env_info(inner: &Inner) -> EnvInfo {
 /// Finds the JDK, compiles helper classes and starts the compiler process.
 /// Runs on a background thread at startup and whenever the JDK setting changes.
 fn init_java(app: &AppHandle, inner: &Arc<Inner>) {
+    // Rust: just find rustc (no background process needed).
+    let rust = rust_env::detect();
+    match &rust {
+        Ok(r) => log::info!("using rustc {} at {} (found via {})", r.version, r.rustc.display(), r.source),
+        Err(e) => log::warn!("Rust not available: {}", e.lines().next().unwrap_or("")),
+    }
+    *inner.rust.lock().unwrap() = rust;
     inner.compiler_ready.store(false, Ordering::SeqCst);
     *inner.checker.lock().unwrap() = None;
     let settings = inner.store.settings();
@@ -107,6 +125,25 @@ fn init_java(app: &AppHandle, inner: &Arc<Inner>) {
 
 fn blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> impl std::future::Future<Output = Result<T, String>> {
     async move { tauri::async_runtime::spawn_blocking(f).await.map_err(|e| format!("internal error: {e}"))? }
+}
+
+/// The language implementation for `lang`, ready to check or build code.
+fn with_language<T>(inner: &Inner, lang: &str, f: impl FnOnce(&dyn Language) -> Result<T, String>) -> Result<T, String> {
+    match lang {
+        "java" => {
+            if !inner.compiler_ready.load(Ordering::SeqCst) {
+                return Err(inner.java.lock().unwrap().clone().err().unwrap_or_else(|| "the Java compiler is still starting".into()));
+            }
+            let env = inner.java.lock().unwrap().clone()?;
+            let support = inner.support.lock().unwrap().clone().ok_or("helper classes are not compiled yet")?;
+            f(&Java { env, support, checker: &inner.checker })
+        }
+        "rust" => {
+            let env = inner.rust.lock().unwrap().clone()?;
+            f(&Rust { env, work: inner.paths.cache.join("rust-check"), lock: &inner.rust_lock })
+        }
+        other => Err(format!("unknown language '{other}'")),
+    }
 }
 
 // ------------------------------------------------------------------ commands
@@ -172,8 +209,13 @@ fn delete_problem(state: AppState, slug: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn save_code(state: AppState, slug: String, code: String) -> Result<(), String> {
-    state.store.save_code(&slug, &code)
+fn save_code(state: AppState, slug: String, language: String, code: String) -> Result<(), String> {
+    state.store.save_code(&slug, &language, &code)
+}
+
+#[tauri::command]
+fn set_language(state: AppState, slug: String, language: String) -> Result<(), String> {
+    state.store.set_language(&slug, &language)
 }
 
 #[tauri::command]
@@ -182,16 +224,11 @@ fn save_tests(state: AppState, slug: String, tests: Vec<TestCase>) -> Result<(),
 }
 
 #[tauri::command]
-async fn check_code(state: AppState<'_>, file_name: String, code: String) -> Result<CompileResult, String> {
+async fn check_code(state: AppState<'_>, language: String, file_name: String, code: String) -> Result<CompileResult, String> {
     let inner = state.inner().clone();
     blocking(move || {
-        if !inner.compiler_ready.load(Ordering::SeqCst) {
-            return Err("compiler not ready".into());
-        }
-        let mut guard = inner.checker.lock().unwrap_or_else(|p| p.into_inner());
-        let checker = guard.as_mut().ok_or("compiler not ready")?;
-        checker.compile(&file_name, &code, None, Duration::from_secs(20)).map_err(|e| {
-            log::warn!("live check failed: {e}");
+        with_language(&inner, &language, |lang| lang.check(&file_name, &code)).map_err(|e| {
+            log::debug!("live check ({language}) not available: {e}");
             e
         })
     })
@@ -208,12 +245,12 @@ async fn run_code(state: AppState<'_>, request: RunRequest) -> Result<RunReport,
     }
     blocking(move || {
         let _one_at_a_time = inner.run_lock.lock().unwrap_or_else(|p| p.into_inner());
-        let java = inner.java.lock().unwrap().clone()?;
-        let support = inner.support.lock().unwrap().clone().ok_or("helper classes are not compiled yet")?;
         let settings = inner.store.settings();
-        let env = RunEnv { java: &java, support: &support, runs_dir: &inner.paths.runs, settings: &settings, checker: &inner.checker };
-        let _ = inner.store.save_code(&request.slug, &request.code);
-        let report = runner::run(&env, &request, &cancel);
+        let _ = inner.store.save_code(&request.slug, &request.language, &request.code);
+        let report = with_language(&inner, &request.language, |lang| {
+            let env = RunEnv { lang, runs_dir: &inner.paths.runs, settings: &settings };
+            Ok(runner::run(&env, &request, &cancel))
+        })?;
         runner::prune_runs(&inner.paths.runs, runner::KEEP_RUNS);
         let _ = inner.store.set_verdict(&request.slug, &report.verdict.key());
         Ok(report)
@@ -349,6 +386,8 @@ pub fn run() {
                 support: Mutex::new(None),
                 checker: Mutex::new(None),
                 compiler_ready: AtomicBool::new(false),
+                rust: Mutex::new(Err("looking for Rust...".into())),
+                rust_lock: Mutex::new(()),
                 run_lock: Mutex::new(()),
                 cancel: Mutex::new(None),
             });
@@ -365,6 +404,7 @@ pub fn run() {
             search_problems,
             delete_problem,
             save_code,
+            set_language,
             save_tests,
             check_code,
             run_code,

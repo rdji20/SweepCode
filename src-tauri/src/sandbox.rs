@@ -29,8 +29,9 @@ fn quote(p: &Path) -> String {
 }
 
 /// Profile: allow everything by default, then deny network, fork, exec (except
-/// the JDK's own binaries) and file writes (except the run folder).
-pub fn profile(java_home: &Path, writable_dir: &Path) -> String {
+/// programs inside `exec_dir`: the JDK for Java, the run folder for Rust) and
+/// file writes (except the run folder).
+pub fn profile(exec_dir: &Path, writable_dir: &Path) -> String {
     format!(
         r#"(version 1)
 (allow default)
@@ -41,17 +42,17 @@ pub fn profile(java_home: &Path, writable_dir: &Path) -> String {
 (deny file-write*)
 (allow file-write* (subpath {wd}) (literal "/dev/null") (literal "/dev/zero") (literal "/dev/dtracehelper") (regex #"^/dev/tty"))
 "#,
-        jh = quote(java_home),
+        jh = quote(exec_dir),
         wd = quote(writable_dir)
     )
 }
 
 /// Builds the command, wrapped in the sandbox when it is available.
 /// Paths must be canonical (sandbox rules match real paths, e.g. /private/var).
-pub fn command(program: &Path, java_home: &Path, writable_dir: &Path) -> (Command, bool) {
+pub fn command(program: &Path, exec_dir: &Path, writable_dir: &Path) -> (Command, bool) {
     if available() {
         let mut c = Command::new(SANDBOX_EXEC);
-        c.arg("-p").arg(profile(java_home, writable_dir)).arg(program);
+        c.arg("-p").arg(profile(exec_dir, writable_dir)).arg(program);
         (c, true)
     } else {
         (Command::new(program), false)

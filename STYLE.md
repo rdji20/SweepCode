@@ -116,6 +116,10 @@ follow this order. The ⌘K "Recent" list is the only place sorted by last opene
 **Sidebar items** — Warp's layout: round icon, title, subtitle, `⌘N` on the right.
 Solved problems show a ✓ in the icon instead of the terminal glyph.
 
+**Language switch** — `Java | Rust` as plain text tabs at the left of the editor
+header; the active one gets the pink fill, like every other selected item. The file
+name next to it is dim (`Solution.java` / `solution.rs`).
+
 **Editor** — Monaco with a theme built from the tokens above. Errors are the
 standard red squiggle; a runtime error marks its line with a faint red line tint
 and a thin red bar in the gutter.

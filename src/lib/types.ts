@@ -1,5 +1,9 @@
 // Mirrors the Rust structs (serde camelCase).
 
+export type Lang = "java" | "rust";
+export const LANGS: Lang[] = ["java", "rust"];
+export const LANG_NAME: Record<Lang, string> = { java: "Java", rust: "Rust" };
+
 export interface Param { name: string; type: string }
 
 export type Meta =
@@ -16,6 +20,7 @@ export interface Problem {
   paidOnly: boolean;
   content: string;
   javaCode: string | null;
+  rustCode: string | null;
   meta: Meta | null;
   examples: TestCase[];
   tags: string[];
@@ -24,9 +29,9 @@ export interface Problem {
   source: string;
 }
 
-export interface ProblemState { addedAt: number; openedAt: number; lastVerdict: string | null; solved: boolean }
+export interface ProblemState { addedAt: number; openedAt: number; lastVerdict: string | null; solved: boolean; language: Lang | null }
 
-export interface Workspace { problem: Problem; tests: TestCase[]; code: string; state: ProblemState }
+export interface Workspace { problem: Problem; tests: TestCase[]; codes: Record<Lang, string>; state: ProblemState }
 
 export interface StoredSummary {
   slug: string;
@@ -43,6 +48,8 @@ export interface ProblemSummary { id: string; title: string; slug: string; diffi
 
 export interface JavaEnv { home: string; java: string; javac: string; version: string; major: number; source: string }
 
+export interface RustEnv { rustc: string; version: string; source: string }
+
 export interface Paths { data: string; cache: string; logs: string; runs: string }
 
 export interface EnvInfo {
@@ -51,6 +58,8 @@ export interface EnvInfo {
   compilerReady: boolean;
   sandbox: boolean;
   javaGuard: boolean;
+  rust: RustEnv | null;
+  rustError: string | null;
   paths: Paths;
   appVersion: string;
 }
@@ -105,14 +114,16 @@ export interface ProcessInfo {
   elapsedMs: number;
   stderr: string;
   sandboxed: boolean;
-  javaGuard: boolean;
-  javaVersion: string;
+  guard: boolean;
+  toolchain: string;
+  language: Lang;
   command: string;
 }
 
 export interface RunReport {
   runId: string;
   slug: string;
+  language: Lang;
   startedAt: string;
   verdict: Verdict;
   summary: string;
@@ -124,7 +135,7 @@ export interface RunReport {
   runDir: string;
 }
 
-export interface RunRequest { slug: string; code: string; meta: Meta; tests: TestCase[]; anyOrder: boolean }
+export interface RunRequest { slug: string; code: string; meta: Meta; tests: TestCase[]; anyOrder: boolean; language: Lang }
 
 export interface Settings {
   timeoutSecs: number;
@@ -133,13 +144,19 @@ export interface Settings {
   checkDelayMs: number;
   javaHome: string | null;
   templates: boolean;
+  defaultLanguage: Lang;
 }
 
 export interface LogTail { path: string; lines: string[] }
 
-export function fileNameFor(meta: Meta | null): string {
+export function fileNameFor(meta: Meta | null, lang: Lang = "java"): string {
+  if (lang === "rust") return "solution.rs";
   if (meta && meta.kind === "design") return `${meta.className}.java`;
   return "Solution.java";
+}
+
+export function starterFor(problem: Problem, lang: Lang): string | null {
+  return lang === "rust" ? problem.rustCode : problem.javaCode;
 }
 
 export function inputLabels(meta: Meta | null): string[] {

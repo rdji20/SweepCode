@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import type { EnvInfo, Settings } from "../lib/types";
+import type { EnvInfo, Lang, Settings } from "../lib/types";
 import { IconCompass, IconFolder, IconRefresh, IconShield } from "./Icons";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -27,6 +27,13 @@ export function SettingsView(props: { env: EnvInfo | null; settings: Settings; o
           <label className="set-row">
             <span>Declaration templates <span className="dim">(type <code>map</code> then ⇥, or ⌃Space for the list)</span></span>
             <input type="checkbox" checked={draft.templates} onChange={(e) => setDraft({ ...draft, templates: e.target.checked })} />
+          </label>
+          <label className="set-row">
+            <span>Language for problems you haven't picked one for</span>
+            <select className="input" value={draft.defaultLanguage} onChange={(e) => setDraft({ ...draft, defaultLanguage: e.target.value as Lang })}>
+              <option value="java">Java</option>
+              <option value="rust">Rust</option>
+            </select>
           </label>
           <h2>Java</h2>
           <label className="set-row col"><span>JDK folder (leave empty to detect automatically)</span>
@@ -63,7 +70,15 @@ export function SettingsView(props: { env: EnvInfo | null; settings: Settings; o
           ) : (
             <div className="notice bad pre-wrap">{env?.javaError ?? "Looking for Java…"}</div>
           )}
-          <button className="btn btn-small" onClick={() => api.retryJava()}><IconRefresh size={13} /> Detect Java again</button>
+          {env?.rust ? (
+            <>
+              <div className="kv"><span>Rust</span><span className="mono">rustc {env.rust.version} (found via {env.rust.source})</span></div>
+              <div className="kv"><span>rustc</span><span className="mono wrap">{env.rust.rustc}</span></div>
+            </>
+          ) : (
+            <div className="notice warn pre-wrap">{env?.rustError ?? "Looking for Rust…"}</div>
+          )}
+          <button className="btn btn-small" onClick={() => api.retryJava()}><IconRefresh size={13} /> Detect Java and Rust again</button>
 
           <h2><IconShield size={15} /> Protection</h2>
           <ul className="prot">
