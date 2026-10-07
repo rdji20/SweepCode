@@ -147,3 +147,9 @@ cd src-tauri && cargo test --lib -- --include-ignored
 ```
 
 The ignored test needs network access to leetcode.com.
+
+## License
+
+[MIT](LICENSE). Bundled third-party parts keep their own licenses: Tauri (MIT / Apache-2.0),
+Monaco Editor (MIT), Hack font (MIT, with Bitstream Vera terms), Roboto font (OFL-1.1),
+DOMPurify (Apache-2.0 / MPL-2.0).
