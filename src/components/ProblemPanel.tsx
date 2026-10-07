@@ -34,7 +34,7 @@ export function ProblemPanel(props: {
           )}
           <button className="icon-btn" title="Open on leetcode.com" onClick={() => api.openLeetcode(problem.slug)}><IconExternal size={15} /></button>
         </div>
-        <div className="tabs">
+        <div className="tabs" data-tour="problem-tabs">
           <button className={`tab ${tab === "desc" ? "is-active" : ""}`} onClick={() => setTab("desc")}>Description</button>
           <button className={`tab ${tab === "tests" ? "is-active" : ""}`} onClick={() => setTab("tests")}>Tests <span className="tab-count">{props.tests.length}</span></button>
         </div>

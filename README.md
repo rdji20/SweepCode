@@ -54,6 +54,9 @@ pnpm tauri build
 | ⇧⌘L | Logs |
 | ⌘, | Settings |
 
+New to the app? A guided tour opens on first launch. Replay it any time from
+**Tour** in the sidebar or **Settings → Help → Show the tour**.
+
 ### Declaration templates
 
 Nothing autocompletes while you type. The one exception you opt into: type a
@@ -155,4 +158,4 @@ The ignored test needs network access to leetcode.com.
 
 [MIT](LICENSE). Bundled third-party parts keep their own licenses: Tauri (MIT / Apache-2.0),
 Monaco Editor (MIT), Hack font (MIT, with Bitstream Vera terms), Roboto font (OFL-1.1),
-DOMPurify (Apache-2.0 / MPL-2.0).
+DOMPurify (Apache-2.0 / MPL-2.0), driver.js (MIT).

@@ -22,3 +22,4 @@ export const IconChevron = ({ size, className }: P) => (<svg {...base(size)} cla
 export const IconRefresh = ({ size, className }: P) => (<svg {...base(size)} className={className}><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>);
 export const IconTrash = ({ size, className }: P) => (<svg {...base(size)} className={className}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>);
 export const IconWarn = ({ size, className }: P) => (<svg {...base(size)} className={className}><path d="M12 4 2.5 20h19z" /><path d="M12 10v4M12 17.5v.5" /></svg>);
+export const IconCompass = ({ size, className }: P) => (<svg {...base(size)} className={className}><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5z" /></svg>);

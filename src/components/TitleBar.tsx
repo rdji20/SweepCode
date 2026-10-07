@@ -77,7 +77,7 @@ export const TitleBar = forwardRef<TitleBarHandle, {
         <button className="icon-btn" title="Toggle sidebar (⌘B)" onClick={props.onToggleSidebar}><IconSidebar size={18} /></button>
       </div>
       <div className="search-wrap">
-        <div className={`search ${open ? "is-open" : ""}`}>
+        <div className={`search ${open ? "is-open" : ""}`} data-tour="search">
           <IconSearch size={16} className="search-icon" />
           <input
             ref={input}

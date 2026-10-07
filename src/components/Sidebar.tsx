@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { difficultyClass, verdictLabel, verdictTone } from "../lib/labels";
 import type { StoredSummary, Verdict } from "../lib/types";
-import { IconCheck, IconGear, IconLogs, IconPlus, IconSearch, IconTerminal, IconX } from "./Icons";
+import { IconCheck, IconCompass, IconGear, IconLogs, IconPlus, IconSearch, IconTerminal, IconX } from "./Icons";
 
 export type View = "problem" | "logs" | "settings";
 
@@ -13,6 +13,7 @@ export function Sidebar(props: {
   onRemove: (slug: string) => void;
   onNew: () => void;
   onView: (v: View) => void;
+  onTour: () => void;
 }) {
   const [filter, setFilter] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export function Sidebar(props: {
         <button className="icon-btn" title="Load a problem (⌘K)" onClick={props.onNew}><IconPlus size={18} /></button>
       </div>
 
-      <div className="cards">
+      <div className="cards" data-tour="problems">
         {list.length === 0 && <div className="empty-note">{f ? "No match." : "No problems yet. Press ⌘K to load one."}</div>}
         {list.map((p) => {
           const idx = props.problems.indexOf(p);
@@ -73,13 +74,16 @@ export function Sidebar(props: {
         })}
       </div>
 
-      <div className="sidebar-foot">
+      <div className="sidebar-foot" data-tour="tools">
         <div className="side-section">Tools</div>
         <div className={`side-item ${props.view === "logs" ? "is-active" : ""}`} onClick={() => props.onView("logs")}>
           <span className="side-icon"><IconLogs size={16} /></span><span>Logs</span><span className="card-kbd">⇧⌘L</span>
         </div>
         <div className={`side-item ${props.view === "settings" ? "is-active" : ""}`} onClick={() => props.onView("settings")}>
           <span className="side-icon"><IconGear size={16} /></span><span>Settings</span><span className="card-kbd">⌘,</span>
+        </div>
+        <div className="side-item" onClick={props.onTour}>
+          <span className="side-icon"><IconCompass size={16} /></span><span>Tour</span>
         </div>
       </div>
     </aside>

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { EnvInfo, Settings } from "../lib/types";
-import { IconFolder, IconRefresh, IconShield } from "./Icons";
+import { IconCompass, IconFolder, IconRefresh, IconShield } from "./Icons";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
-export function SettingsView(props: { env: EnvInfo | null; settings: Settings; onSaved: (s: Settings) => void }) {
+export function SettingsView(props: { env: EnvInfo | null; settings: Settings; onSaved: (s: Settings) => void; onTour: () => void }) {
   const [draft, setDraft] = useState(props.settings);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -42,6 +43,16 @@ export function SettingsView(props: { env: EnvInfo | null; settings: Settings; o
         </section>
 
         <section className="set-card">
+          <h2>Help</h2>
+          <div className="set-row">
+            <span>Guided tour of the app <span className="dim">(also under Tour in the sidebar)</span></span>
+            <button className="btn btn-small" onClick={props.onTour}><IconCompass size={13} /> Show the tour</button>
+          </div>
+          <div className="set-row">
+            <span>How problems work and how to add your own</span>
+            <button className="btn btn-small" onClick={() => openUrl("https://github.com/rdji20/prob-warp/blob/main/docs/TUTORIAL.md")}>Open tutorial</button>
+          </div>
+
           <h2>Environment</h2>
           {env?.java ? (
             <>

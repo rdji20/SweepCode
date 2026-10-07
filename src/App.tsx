@@ -14,6 +14,7 @@ import { Split } from "./components/Split";
 import { TitleBar, type TitleBarHandle } from "./components/TitleBar";
 import { IconWarn, IconX } from "./components/Icons";
 import { TemplatePalette } from "./components/TemplatePalette";
+import { startTour, tourSeen } from "./lib/tour";
 
 const DEFAULT_SETTINGS: Settings = { timeoutSecs: 10, memoryMb: 256, fontSize: 14, checkDelayMs: 450, javaHome: null, templates: true };
 
@@ -227,6 +228,21 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", h);
   }, []);
 
+  // The tour needs the problem view on screen with the sidebar open.
+  const openTour = useCallback(() => {
+    setView("problem");
+    setSidebar(true);
+    setTimeout(() => startTour(() => editor.current?.focus()), 120);
+  }, []);
+
+  // First launch: show the tour once a problem is open.
+  const tourChecked = useRef(false);
+  useEffect(() => {
+    if (tourChecked.current || !ws) return;
+    tourChecked.current = true;
+    if (!tourSeen()) setTimeout(openTour, 600);
+  }, [ws, openTour]);
+
   const removeProblem = (s: string) => {
     api.deleteProblem(s)
       .then(() => {
@@ -278,6 +294,7 @@ export default function App() {
             onRemove={removeProblem}
             onNew={() => titlebar.current?.focusSearch()}
             onView={(v) => setView((cur) => (cur === v ? "problem" : v))}
+            onTour={openTour}
           />
         )}
         <main className="main">
@@ -291,7 +308,7 @@ export default function App() {
             </div>
           )}
           {view === "logs" && <LogsView />}
-          {view === "settings" && <SettingsView env={env} settings={settings} onSaved={setSettings} />}
+          {view === "settings" && <SettingsView env={env} settings={settings} onSaved={setSettings} onTour={openTour} />}
           {view === "problem" && !ws && (
             <div className="empty-main">
               <div className="empty-title">Load a problem</div>
@@ -316,7 +333,7 @@ export default function App() {
                       min={0.2}
                       max={0.88}
                       first={
-                        <section className="panel editor-panel">
+                        <section className="panel editor-panel" data-tour="editor">
                           <div className="editor-head">
                             <span className={`file-tab ${saved ? "" : "is-dirty"}`}>{fileName}</span>
                             <span className="spacer" />

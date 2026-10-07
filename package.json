@@ -16,6 +16,7 @@
     "@tauri-apps/plugin-log": "^2.10.0",
     "@tauri-apps/plugin-opener": "^2",
     "dompurify": "^3.4.16",
+    "driver.js": "^1.9.0",
     "hack-font": "^3.3.0",
     "monaco-editor": "^0.57.0",
     "react": "^19.1.0",

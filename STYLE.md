@@ -28,6 +28,7 @@ Only where Warp uses one:
 | Active item in the sidebar | Warp's active tab is a card (lighter fill + 1px border) |
 | Search results dropdown | It floats over content |
 | Toasts | They float over content |
+| Guided tour popover | Floats over a dimmed app; charcoal `#2f2e2b`, cream text, 12px radius, outline buttons with an orange Next, pink ring on the spotlighted part |
 | ⌘I template popup | Small (340px) popup at the cursor. Liquid Glass shape (18px blur, 18px radius, top rim highlight) tinted with our palette: charcoal `#282826` at ~72%, cream rims and sheen, chip-colored selection, accent on the selected prefix |
 
 Everything else is flat.

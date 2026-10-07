@@ -22,7 +22,7 @@ export function OutputPanel(props: {
   }, [props.runs.length, props.running, tab]);
 
   return (
-    <section className="panel output-panel">
+    <section className="panel output-panel" data-tour="output">
       <div className="tabs tabs-tight">
         <button className={`tab ${tab === "runs" ? "is-active" : ""}`} onClick={() => setTab("runs")}>Runs <span className="tab-count">{props.runs.length}</span></button>
         <button className={`tab ${tab === "errors" ? "is-active" : ""}`} onClick={() => setTab("errors")}>
@@ -46,6 +46,7 @@ export function OutputPanel(props: {
                 <div className="welcome-row"><kbd className="kbd">⌘</kbd><kbd className="kbd">K</kbd><span>load any LeetCode problem</span></div>
                 <div className="welcome-row"><kbd className="kbd">⇥</kbd><span>after <code>map</code>, <code>list</code>, <code>arr</code>, <code>pq</code>… writes the declaration</span></div>
                 <div className="welcome-row"><kbd className="kbd">⌘</kbd><kbd className="kbd">I</kbd><span>search declaration templates</span></div>
+                <div className="welcome-row muted">New here? Click <b>&nbsp;Tour&nbsp;</b> in the sidebar.</div>
                 <div className="welcome-row muted">Errors are underlined as you type. Only declarations expand, never logic.</div>
               </div>
             )}

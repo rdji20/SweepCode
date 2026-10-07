@@ -15,9 +15,9 @@ export function HintBar(props: {
   return (
     <footer className="hintbar">
       {props.running ? (
-        <button className="run-btn is-stop" onClick={props.onStop}><IconStop size={13} /> Stop <kbd className="kbd">esc</kbd></button>
+        <button className="run-btn is-stop" onClick={props.onStop} data-tour="run"><IconStop size={13} /> Stop <kbd className="kbd">esc</kbd></button>
       ) : (
-        <button className="run-btn" onClick={props.onRun} disabled={!props.canRun}><IconPlay size={13} /> Run <kbd className="kbd">⌘↵</kbd></button>
+        <button className="run-btn" onClick={props.onRun} disabled={!props.canRun} data-tour="run"><IconPlay size={13} /> Run <kbd className="kbd">⌘↵</kbd></button>
       )}
       <span className="hint-status">
         {props.checking ? <span className="muted">checking…</span>

@@ -69,6 +69,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done and verified
 - [x] 7b.3 On/off switch in Settings; templates editable in `src/lib/templates.ts`
 - [x] 7b.4 ⌘I small Liquid Glass popup anchored at the cursor (flips above near the bottom): search by meaning ("heap", "2d", "graph"), Enter/Tab inserts with slots, Esc or ⌘I again closes it
 
+## 7c. Guided tour
+- [x] 7c.1 driver.js tour (8 steps: search, problems, tabs, editor + templates, Run, output, tools), restyled in the app palette with a pink spotlight ring
+- [x] 7c.2 Opens once on first launch; replay from Tour in the sidebar or Settings → Help → Show the tour
+- [x] 7c.3 Settings → Help → Open tutorial opens docs/TUTORIAL.md on GitHub
+
 ## 8. Verification
 - [x] 8.1 Rust unit + integration tests pass
 - [x] 8.2 Frontend typechecks and builds
