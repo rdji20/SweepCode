@@ -94,11 +94,11 @@ export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> =
       case "get_settings": return settings;
       case "save_settings": settings = a.settings; return settings;
       case "read_logs":
-        return { path: "/mock/logs/prob-warp.log", lines: [
-          "[2026-10-07][10:41:58][prob_warp_lib][INFO] prob-warp 0.1.0 starting",
-          "[2026-10-07][10:41:59][prob_warp_lib][INFO] using Java 17.0.8 at /mock/jdk (found via SDKMAN)",
-          "[2026-10-07][10:42:03][prob_warp_lib::runner][INFO] run 20261007-104203-000: start slug=two-sum tests=3",
-          "[2026-10-07][10:42:03][prob_warp_lib::runner][WARN] run 20261007-104203-000: stderr: Exception in thread \"main\"",
+        return { path: "/mock/logs/sweepcode.log", lines: [
+          "[2026-10-07][10:41:58][sweepcode_lib][INFO] SweepCode 0.1.0 starting",
+          "[2026-10-07][10:41:59][sweepcode_lib][INFO] using Java 17.0.8 at /mock/jdk (found via SDKMAN)",
+          "[2026-10-07][10:42:03][sweepcode_lib::runner][INFO] run 20261007-104203-000: start slug=two-sum tests=3",
+          "[2026-10-07][10:42:03][sweepcode_lib::runner][WARN] run 20261007-104203-000: stderr: Exception in thread \"main\"",
           "  at PwDriver.main(PwDriver.java:40)",
           "[2026-10-07][10:42:04][webview][ERROR] [ui] uncaught error: x is undefined",
         ] };

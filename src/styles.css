@@ -1,4 +1,4 @@
-/* prob-warp — follows Warp's look. Decisions are written down in STYLE.md. */
+/* SweepCode — follows Warp's look. Decisions are written down in STYLE.md. */
 :root {
   --bg: #282826;          /* one flat background, like Warp */
   --bg-input: #222220;    /* text fields and code samples */

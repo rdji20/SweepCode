@@ -1,4 +1,4 @@
-# prob-warp — build status
+# SweepCode — build status
 
 A Warp-styled desktop app (Tauri 2 + React + Monaco) for solving LeetCode problems in
 Java locally: live compiler errors as you type, no autocomplete, run against the
@@ -7,7 +7,7 @@ examples, sandboxed execution, and a log you can read when something breaks.
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done and verified
 
 ## 0. Groundwork
-- [x] 0.1 Scaffold Tauri 2 + React + TypeScript + Vite project in `prob-warp/`
+- [x] 0.1 Scaffold Tauri 2 + React + TypeScript + Vite project in `SweepCode/`
 - [x] 0.2 Detect the JDK (JAVA_HOME, `/usr/libexec/java_home`, PATH) and report it to the UI
 
 ## 1. Safety: running untrusted code
@@ -100,7 +100,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done and verified
 
 - Declaration templates: checked in the preview: `map`+Tab, slot editing, `arr2` linked type slots, plain Tab still indents, `p`+⌃Space lists only pq templates.
 
-- Distribution: `.github/workflows/macos.yml` (modeled on dealer-control-v2's Windows pipeline): macOS tests, then a universal (arm64 + x86_64) ad-hoc-signed `.dmg` with SHA-256 checksums and build.txt; `v*` tags publish a GitHub Release. Local universal build verified (lipo, codesign, hdiutil) and ran Accepted inside the sandbox. Public repo: https://github.com/rdji20/prob-warp. First CI run green.
+- Distribution: `.github/workflows/macos.yml` (modeled on dealer-control-v2's Windows pipeline): macOS tests, then a universal (arm64 + x86_64) ad-hoc-signed `.dmg` with SHA-256 checksums and build.txt; `v*` tags publish a GitHub Release. Local universal build verified (lipo, codesign, hdiutil) and ran Accepted inside the sandbox. Public repo: https://github.com/rdji20/SweepCode. First CI run green.
 
 ## Not done / known limits
 - Not notarized: needs an Apple Developer ID ($99/yr). Until then users click "Open Anyway" once (README explains).

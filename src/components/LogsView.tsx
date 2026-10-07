@@ -12,7 +12,7 @@ const LEVELS = new Set(["TRACE", "DEBUG", "INFO", "WARN", "ERROR"]);
 /** Shortens "webview::send@http://localhost:1420/src/lib/log.ts:16:4" to "ui". */
 function shortTarget(t: string): string {
   if (t.startsWith("webview")) return "ui";
-  return t.replace("prob_warp_lib::", "").replace("prob_warp_lib", "app");
+  return t.replace("sweepcode_lib::", "").replace("sweepcode_lib", "app");
 }
 
 function parse(lines: string[]): Entry[] {

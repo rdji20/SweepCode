@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- prob-warp app icon: a terminal prompt and a pencil (you write the code yourself).
+  <!-- SweepCode app icon: a terminal prompt and a pencil (you write the code yourself).
        Palette from the app: charcoal #282826, cream #ddd0b2, Warp pink #b16286, orange #e9a23b. -->
   <defs>
     <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">

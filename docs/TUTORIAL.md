@@ -1,4 +1,4 @@
-# Problems in prob-warp: how they work and how to add one
+# Problems in SweepCode: how they work and how to add one
 
 This guide has three parts:
 
@@ -35,7 +35,7 @@ This guide has three parts:
 **Saving.** Each problem is a folder of plain files you can open and edit:
 
 ```
-~/Library/Application Support/com.probwarp.app/problems/<slug>/
+~/Library/Application Support/com.sweepcode.app/problems/<slug>/
   problem.json    what LeetCode sent (description, method, examples)
   tests.json      your test cases (the Tests tab)
   Solution.java   your code (saved as you type)
@@ -120,11 +120,11 @@ variation. There's no button for it yet; you make a folder. A complete working
 example is in [`examples/custom-problem/count-target`](../examples/custom-problem/count-target).
 
 **Step 1. Copy the example into your problems folder.** Run this from the
-prob-warp repo folder. The folder name becomes the problem's id: use lowercase
+SweepCode repo folder. The folder name becomes the problem's id: use lowercase
 letters, digits and dashes.
 
 ```bash
-cp -R examples/custom-problem/count-target "$HOME/Library/Application Support/com.probwarp.app/problems/my-problem"
+cp -R examples/custom-problem/count-target "$HOME/Library/Application Support/com.sweepcode.app/problems/my-problem"
 ```
 
 **Step 2. Edit `problem.json`.**
@@ -192,7 +192,7 @@ line per parameter, in the formats from the table above. `expected` can be `null
 **Step 4. Put the starter code in `Solution.java`** (or delete it, and the app
 uses `javaCode`).
 
-**Step 5. Quit and reopen prob-warp** (⌘Q). The problem appears at the bottom
+**Step 5. Quit and reopen SweepCode** (⌘Q). The problem appears at the bottom
 of the sidebar. Press ⌘↵: the untouched starter code gives "missing return
 statement", which means everything is wired up.
 

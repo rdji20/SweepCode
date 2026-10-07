@@ -79,6 +79,28 @@ pub struct Store {
     root: PathBuf,
 }
 
+/// The app was renamed from prob-warp to SweepCode, which changed its data folder
+/// (`com.probwarp.app` -> `com.sweepcode.app`). Moves the old folder over once so
+/// nobody loses their problems and code. Returns true when something was moved.
+pub fn migrate_legacy_data(old: &Path, new: &Path) -> Result<bool, String> {
+    if !old.is_dir() {
+        return Ok(false);
+    }
+    let new_has_problems = std::fs::read_dir(new.join("problems")).map(|mut r| r.next().is_some()).unwrap_or(false);
+    if new_has_problems {
+        return Ok(false); // already using the new folder; leave the old one alone
+    }
+    if new.exists() {
+        // Empty leftovers (e.g. settings.json only) would block a rename.
+        std::fs::remove_dir_all(new).map_err(|e| format!("cannot clear {}: {e}", new.display()))?;
+    }
+    if let Some(parent) = new.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(old, new).map_err(|e| format!("cannot move {} to {}: {e}", old.display(), new.display()))?;
+    Ok(true)
+}
+
 fn write_atomic(path: &Path, data: &[u8]) -> Result<(), String> {
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, data).map_err(|e| format!("cannot write {}: {e}", tmp.display()))?;
@@ -294,6 +316,28 @@ mod tests {
         s.save_problem(&p).unwrap();
         assert_eq!(order(&s), ["first-one", "second-one", "third-one"]);
         assert!(s.load("../x").is_err());
+    }
+
+    #[test]
+    fn legacy_data_moves_to_the_new_folder_once() {
+        let root = tempfile::tempdir().unwrap();
+        let old = root.path().join("com.probwarp.app");
+        let new = root.path().join("com.sweepcode.app");
+        let s = Store::new(old.clone()).unwrap();
+        s.save_problem(&problem()).unwrap();
+        s.save_code("two-sum", "class Solution { /* mine */ }").unwrap();
+
+        assert!(migrate_legacy_data(&old, &new).unwrap());
+        assert!(!old.exists());
+        let moved = Store::new(new.clone()).unwrap();
+        assert_eq!(moved.load("two-sum").unwrap().code, "class Solution { /* mine */ }");
+
+        // Second launch: nothing to do.
+        assert!(!migrate_legacy_data(&old, &new).unwrap());
+        // A new folder with problems is never overwritten by an old one.
+        Store::new(old.clone()).unwrap().save_problem(&problem()).unwrap();
+        assert!(!migrate_legacy_data(&old, &new).unwrap());
+        assert!(old.exists());
     }
 
     #[test]

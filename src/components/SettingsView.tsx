@@ -50,7 +50,7 @@ export function SettingsView(props: { env: EnvInfo | null; settings: Settings; o
           </div>
           <div className="set-row">
             <span>How problems work and how to add your own</span>
-            <button className="btn btn-small" onClick={() => openUrl("https://github.com/rdji20/prob-warp/blob/main/docs/TUTORIAL.md")}>Open tutorial</button>
+            <button className="btn btn-small" onClick={() => openUrl("https://github.com/rdji20/SweepCode/blob/main/docs/TUTORIAL.md")}>Open tutorial</button>
           </div>
 
           <h2>Environment</h2>
@@ -85,7 +85,7 @@ export function SettingsView(props: { env: EnvInfo | null; settings: Settings; o
               </div>
             </>
           )}
-          <div className="muted small">prob-warp {env?.appVersion}</div>
+          <div className="muted small">SweepCode {env?.appVersion}</div>
         </section>
       </div>
     </div>

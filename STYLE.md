@@ -1,4 +1,4 @@
-# prob-warp — style
+# SweepCode — style
 
 The reference is Warp itself (the reference screenshots: the sidebar with the
 "New session" card and the "New terminal session" screen). When in doubt, do what

@@ -24,7 +24,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 use tauri_plugin_opener::OpenerExt;
 
-const LOG_FILE: &str = "prob-warp";
+const LOG_FILE: &str = "sweepcode";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -305,7 +305,7 @@ pub fn run() {
             Target::new(TargetKind::Stdout),
         ])
         .level(log::LevelFilter::Info)
-        .level_for("prob_warp_lib", log::LevelFilter::Debug)
+        .level_for("sweepcode_lib", log::LevelFilter::Debug)
         .max_file_size(2_000_000)
         .rotation_strategy(RotationStrategy::KeepSome(5))
         .timezone_strategy(TimezoneStrategy::UseLocal)
@@ -325,10 +325,18 @@ pub fn run() {
                 logs: path.app_log_dir()?,
                 runs: path.app_cache_dir()?.join("runs"),
             };
+            // Renamed from prob-warp: bring the old data folder over before anything is created.
+            if let Some(parent) = paths.data.parent() {
+                match store::migrate_legacy_data(&parent.join("com.probwarp.app"), &paths.data) {
+                    Ok(true) => log::info!("moved data from com.probwarp.app to {}", paths.data.display()),
+                    Ok(false) => {}
+                    Err(e) => log::warn!("could not move old prob-warp data: {e}"),
+                }
+            }
             for p in [&paths.data, &paths.cache, &paths.logs, &paths.runs] {
                 std::fs::create_dir_all(p)?;
             }
-            log::info!("prob-warp {} starting; data={} cache={} logs={}", env!("CARGO_PKG_VERSION"), paths.data.display(), paths.cache.display(), paths.logs.display());
+            log::info!("SweepCode {} starting; data={} cache={} logs={}", env!("CARGO_PKG_VERSION"), paths.data.display(), paths.cache.display(), paths.logs.display());
             let store = Store::new(paths.data.clone())?;
             if store.is_empty() {
                 store.save_problem(&sample::two_sum())?;

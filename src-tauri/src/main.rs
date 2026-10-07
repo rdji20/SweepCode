@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    prob_warp_lib::run()
+    sweepcode_lib::run()
 }

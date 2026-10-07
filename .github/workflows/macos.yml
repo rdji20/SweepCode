@@ -75,7 +75,7 @@ jobs:
           ls -la
       - uses: actions/upload-artifact@v7
         with:
-          name: prob-warp-macos-universal
+          name: sweepcode-macos-universal
           path: |
             ${{ env.BUNDLE }}/dmg/*.dmg
             ${{ env.BUNDLE }}/dmg/*.sha256
@@ -91,8 +91,8 @@ jobs:
           generate_release_notes: true
           body: |
             ## Install
-            1. Download the `.dmg`, open it and drag **prob-warp** into Applications.
+            1. Download the `.dmg`, open it and drag **SweepCode** into Applications.
             2. The app is not notarized by Apple yet, so the first launch is blocked.
                Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
-               Or run once in Terminal: `xattr -dr com.apple.quarantine /Applications/prob-warp.app`
+               Or run once in Terminal: `xattr -dr com.apple.quarantine /Applications/SweepCode.app`
             3. You need a JDK 11 or newer, for example `brew install openjdk@21`.

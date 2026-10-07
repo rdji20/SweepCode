@@ -637,7 +637,7 @@ mod tests {
     fn dangerous_calls_are_blocked() {
         let f = fixture();
         let home = std::env::var("HOME").unwrap();
-        let target = format!("{home}/prob-warp-should-not-exist.txt");
+        let target = format!("{home}/sweepcode-should-not-exist.txt");
         let code = format!("class Solution {{\n  public int f(int k) throws Exception {{\n    if (k == 0) System.exit(1);\n    if (k == 1) new java.io.FileOutputStream(\"{target}\").write(1);\n    if (k == 2) Runtime.getRuntime().exec(new String[]{{\"/usr/bin/touch\", \"{target}\"}});\n    if (k == 3) new java.net.Socket(\"1.1.1.1\", 80).close();\n    return k;\n  }}\n}}\n");
         let r = go(&f, func("f", &[("k", "integer")], None), &code, vec![tc(&["0"], None), tc(&["1"], None), tc(&["2"], None), tc(&["3"], None), tc(&["4"], Some("4"))], 10);
         for i in 0..4 {

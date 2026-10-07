@@ -8,7 +8,7 @@ use std::sync::LazyLock;
 use std::time::Duration;
 
 const ENDPOINT: &str = "https://leetcode.com/graphql";
-const UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) prob-warp/0.1";
+const UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) SweepCode/0.1";
 
 const QUESTION_QUERY: &str = "query questionData($titleSlug: String!) { question(titleSlug: $titleSlug) { questionFrontendId title titleSlug content difficulty isPaidOnly exampleTestcases sampleTestCase metaData codeSnippets { langSlug code } topicTags { name } hints } }";
 const LIST_QUERY: &str = "query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) { questionList(categorySlug: $categorySlug, limit: $limit, skip: $skip, filters: $filters) { totalNum data { questionFrontendId title titleSlug difficulty isPaidOnly } } }";

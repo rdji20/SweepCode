@@ -7,7 +7,7 @@ const SEEN_KEY = "pw.tourSeen";
 const steps: DriveStep[] = [
   {
     popover: {
-      title: "Welcome to prob-warp",
+      title: "Welcome to SweepCode",
       description: "Solve LeetCode problems in Java with real compiler errors and no autocomplete. This tour takes about a minute. Use ← → or the buttons.",
     },
   },

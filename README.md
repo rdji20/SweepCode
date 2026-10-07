@@ -1,4 +1,4 @@
-# prob-warp
+# SweepCode
 
 Solve LeetCode problems in Java on your Mac, Warp style.
 Compiler errors are underlined as you type, nothing autocompletes, and Run
@@ -6,16 +6,16 @@ checks your code against the examples like LeetCode does.
 
 ## Download
 
-Get the latest `.dmg` from the [Releases page](https://github.com/rdji20/prob-warp/releases/latest).
+Get the latest `.dmg` from the [Releases page](https://github.com/rdji20/SweepCode/releases/latest).
 It runs on Apple Silicon and Intel Macs (macOS 11+).
 
-1. Open the `.dmg` and drag **prob-warp** into Applications.
+1. Open the `.dmg` and drag **SweepCode** into Applications.
 2. The app isn't notarized by Apple yet, so macOS blocks the first launch.
    Go to **System Settings → Privacy & Security**, scroll down, click **Open Anyway**.
    Or run this once:
 
    ```bash
-   xattr -dr com.apple.quarantine /Applications/prob-warp.app
+   xattr -dr com.apple.quarantine /Applications/SweepCode.app
    ```
 3. Install a JDK 11 or newer if you don't have one:
 
@@ -35,7 +35,7 @@ pnpm install
 pnpm tauri dev
 ```
 
-Build the app (lands in `src-tauri/target/release/bundle/macos/prob-warp.app`):
+Build the app (lands in `src-tauri/target/release/bundle/macos/SweepCode.app`):
 
 ```bash
 pnpm tauri build
@@ -115,10 +115,10 @@ Infinite loops show up as **Time Limit Exceeded** on the exact test that hung.
 
 - **Logs view** (⇧⌘L) shows the app log live: every run, the exact Java command,
   exit status, stderr, and UI errors.
-- Log file: `~/Library/Logs/com.probwarp.app/prob-warp.log`
+- Log file: `~/Library/Logs/com.sweepcode.app/sweepcode.log`
 - Each run keeps a folder with the code, job, raw results and `report.json`
-  (last 20 runs): `~/Library/Caches/com.probwarp.app/runs/`
-- Your problems, tests and code: `~/Library/Application Support/com.probwarp.app/problems/`
+  (last 20 runs): `~/Library/Caches/com.sweepcode.app/runs/`
+- Your problems, tests and code: `~/Library/Application Support/com.sweepcode.app/problems/`
 - **No JDK found**: set the JDK folder in Settings, then "Detect Java again".
 
 ## Layout
