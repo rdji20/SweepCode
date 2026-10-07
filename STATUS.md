@@ -95,7 +95,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done and verified
 
 - Declaration templates: checked in the preview: `map`+Tab, slot editing, `arr2` linked type slots, plain Tab still indents, `p`+⌃Space lists only pq templates.
 
+- Distribution: `.github/workflows/macos.yml` (modeled on dealer-control-v2's Windows pipeline): macOS tests, then a universal (arm64 + x86_64) ad-hoc-signed `.dmg` with SHA-256 checksums and build.txt; `v*` tags publish a GitHub Release. Local universal build verified (lipo, codesign, hdiutil) and ran Accepted inside the sandbox. Public repo: https://github.com/rdji20/prob-warp. First CI run green.
+
 ## Not done / known limits
+- Not notarized: needs an Apple Developer ID ($99/yr). Until then users click "Open Anyway" once (README explains).
 - Submitting to LeetCode stays on leetcode.com (the ↗ button). Needs your session cookie, left out on purpose.
 - Graph `Node`, N-ary trees, NestedInteger and interactive problems show "parameter type ... is not supported yet".
 - Java only.
